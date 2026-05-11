@@ -150,10 +150,24 @@ function AIBriefing({ user, progress, tasks }) {
           localStorage.setItem('aura_briefing_date', today);
         }
       })
+      .catch(err => {
+        console.error('[Aura] Briefing failed:', err);
+        setMsg('Aura is currently adjusting her focus. Check back later for your briefing.');
+      })
       .finally(() => setLoading(false));
   }, [user?.name, progress?.streak, progress?.xp, tasks]);
 
-  if (!AI.enabled() && !msg) return null;
+  if (!AI.enabled() && !msg) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        style={{ padding: '12px', fontSize: '11px', color: 'var(--t4)', textAlign: 'center', background: 'var(--s1)', borderRadius: '12px', border: '1px dashed var(--card-b)' }}
+      >
+        AI Briefing unavailable. Please ensure VITE_GROQ_API_KEY is configured.
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 

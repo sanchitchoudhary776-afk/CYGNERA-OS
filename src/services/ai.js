@@ -12,17 +12,34 @@ const MODELS = {
 // ─── Client ─────────────────────────────────────────────────
 const getClient = () => {
   const envKey = import.meta.env.VITE_GROQ_API_KEY;
-  if (!envKey || envKey === 'your_key_here' || envKey === 'your_groq_api_key_here') {
-    console.warn('[AI] Groq key is missing or placeholder');
+  
+  if (!envKey) {
+    console.error('[AI] CRITICAL: VITE_GROQ_API_KEY is undefined. Make sure to add it to your Vercel/Production environment variables.');
+    return null;
+  }
+
+  if (envKey === 'your_key_here' || envKey === 'your_groq_api_key_here') {
+    console.warn('[AI] Placeholder key detected. AI features will be disabled.');
     return null;
   }
 
   const keys = envKey.split(',').map(k => k.trim()).filter(Boolean);
-  if (keys.length === 0) return null;
+  if (keys.length === 0) {
+    console.error('[AI] No valid keys found in VITE_GROQ_API_KEY string.');
+    return null;
+  }
 
   const key = keys[Math.floor(Math.random() * keys.length)];
-  if (import.meta.env.DEV) console.log(`[AI] Using Groq key: ${key.slice(0, 8)}...`);
-  return new Groq({ apiKey: key, dangerouslyAllowBrowser: true });
+  if (import.meta.env.DEV) {
+    console.log(`[AI] Initializing Groq client with key: ${key.slice(0, 8)}...`);
+  }
+  
+  try {
+    return new Groq({ apiKey: key, dangerouslyAllowBrowser: true });
+  } catch (err) {
+    console.error('[AI] Failed to initialize Groq SDK:', err);
+    return null;
+  }
 };
 
 export const AI = {
