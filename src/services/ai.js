@@ -42,6 +42,7 @@ const callGroqAPI = async (payload, apiKey) => {
 
 const callWithRetry = async (params, retries = 3) => {
   const envKey = import.meta.env.VITE_GROQ_API_KEY;
+  console.log('[AI] Environment Key Detected:', !!envKey);
   if (!envKey || envKey.includes('your_key_here')) {
     console.error('[AI] Key missing or placeholder in environment.');
     return null;

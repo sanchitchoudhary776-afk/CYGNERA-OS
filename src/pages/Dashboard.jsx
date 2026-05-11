@@ -152,7 +152,7 @@ function AIBriefing({ user, progress, tasks }) {
       })
       .catch(err => {
         console.error('[Aura] Briefing failed:', err);
-        setMsg('Aura is currently adjusting her focus. Check back later for your briefing.');
+        setMsg(`Aura is facing an issue: ${err.message || 'Unknown Connection Error'}. Please check your API keys or console logs.`);
       })
       .finally(() => setLoading(false));
   }, [user?.name, progress?.streak, progress?.xp, tasks]);
