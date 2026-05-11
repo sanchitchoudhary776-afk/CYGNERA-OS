@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@context/AuthContext';
+import { useTheme } from '@context/ThemeContext';
 import { useApp }  from '@context/AppContext';
 import { dailyBriefing } from '@services/ai';
 import { AI } from '@services/ai';
@@ -26,7 +28,7 @@ function RingProgress({ pct=0, size=160, stroke=10, color='var(--p)', label='', 
         <circle cx={size/2} cy={size/2} r={r} fill="none"
           stroke={color} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={offset}
-          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.25,0.46,0.45,0.94)', willChange: 'stroke-dashoffset' }}/>
+          style={{ transition:'stroke-dashoffset 1.2s cubic-bezier(0.25,0.46,0.45,0.94)' }}/>
       </svg>
       <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center' }}>
         <p style={{ fontSize: size > 130 ? 28 : 20, fontWeight:800, color:'var(--t1)', lineHeight:1, letterSpacing:'-0.03em', animation:'numberUp 600ms 400ms ease both' }}>{Math.round(pct)}%</p>
@@ -51,7 +53,6 @@ function ActivityBars({ data }) {
             <div key={d} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, height:'100%', justifyContent:'flex-end' }}>
               <div style={{ width:'100%', borderRadius:999, overflow:'hidden', height:`${Math.max(hPct,8)}%`,
                 background: isToday ? `linear-gradient(180deg,${c},${c}dd)` : `${c}22`,
-                transition:`height 900ms ${100+i*60}ms cubic-bezier(0.34,1.56,0.64,1)`,
                 animation:`barGrow 600ms ${i*60}ms ease both`,
               }}/>
             </div>
@@ -153,29 +154,73 @@ function AIBriefing({ user, progress, tasks }) {
   }, [user?.name, progress?.streak, progress?.xp, tasks]);
 
   if (!AI.enabled() && !msg) return null;
+
   return (
-    <div style={{ 
-      padding:'16px 20px', 
-      borderRadius:'var(--r-xl)', 
-      background:'var(--s2)',
-      border:'1px solid rgba(96, 165, 250, 0.15)',
-      display:'flex', 
-      alignItems:'flex-start', 
-      gap:14,
-      boxShadow: 'var(--sh)',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      <div style={{ width:36,height:36,borderRadius:12,background:'rgba(96,165,250,0.12)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0, border:'1px solid rgba(96,165,250,0.2)' }}>
-        <span className="material-symbols-outlined" style={{ fontSize:18,color:'#60a5fa',fontVariationSettings:"'FILL' 1" }}>psychology</span>
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="ai-card-premium"
+      style={{ 
+        position: 'relative',
+        padding: '20px 24px', 
+        borderRadius: 'var(--r-xl)', 
+        background: 'var(--s2)', 
+        backdropFilter: 'blur(20px) saturate(180%)',
+        border: '1px solid color-mix(in srgb, var(--p-blue) 25%, transparent)',
+        display:'flex', 
+        alignItems:'flex-start', 
+        gap:18,
+        boxShadow: 'var(--sh-lg)',
+        overflow: 'hidden'
+      }}
+    >
+      {/* Subtle Mesh Background (Theme Aware) */}
+      <div style={{ 
+        position: 'absolute', inset: 0, 
+        background: 'radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--p-blue) 5%, transparent), transparent 40%), radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--p-purple) 5%, transparent), transparent 40%)',
+        pointerEvents: 'none' 
+      }} />
+
+      {/* AI Icon with Soft Pulse */}
+      <div style={{ position: 'relative', flexShrink: 0, marginTop: 2 }}>
+        <div style={{ 
+          width:40, height:40, borderRadius:12, 
+          background: 'color-mix(in srgb, var(--p-blue) 10%, transparent)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          border:'1px solid color-mix(in srgb, var(--p-blue) 20%, transparent)',
+          zIndex: 1, position: 'relative'
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize:20, color:'var(--p-blue)', fontVariationSettings: "'FILL' 1" }}>psychology</span>
+        </div>
+        <div className="ai-pulse-ring" />
       </div>
-      <div style={{ flex:1, minWidth:0 }}>
-        <p style={{ fontSize:11,fontWeight:800,color:'#60a5fa',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:6 }}>Smart Insights</p>
-        {loading ? <div className="ai-dots"><span/><span/><span/></div>
-          : msg ? <p style={{ fontSize:14,color:'var(--t2)',lineHeight:1.6, letterSpacing:'0.01em' }}>{msg}</p>
-          : <p style={{ fontSize:13,color:'var(--t4)' }}>Insights temporarily unavailable. Check your API key or connection in Settings.</p>}
+
+      <div style={{ flex:1, minWidth:0, position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <p className="holographic-text" style={{ fontSize:10.5, fontWeight:900, textTransform:'uppercase', letterSpacing:'0.15em' }}>Smart Insights</p>
+          <div style={{ width:4, height:4, borderRadius:'50%', background:'var(--p-blue)', opacity: 0.5 }} />
+          <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--t4)', opacity: 0.5 }}>AURA ACTIVE</span>
+        </div>
+
+        {loading ? (
+          <div style={{ display:'flex', alignItems:'center', gap:10, padding: '4px 0' }}>
+            <div className="ai-dots"><span/><span/><span/></div>
+            <span style={{ fontSize:13, color:'var(--t4)' }}>Processing insights...</span>
+          </div>
+        ) : msg ? (
+          <p style={{ fontSize:14, color:'var(--t1)', lineHeight:1.7, fontWeight: 500 }}>
+            {msg}
+          </p>
+        ) : (
+          <p style={{ fontSize:13, color:'var(--t4)', fontStyle: 'italic' }}>Insights unavailable. Check connection.</p>
+        )}
       </div>
-    </div>
+
+      {/* Decorative subtle corner element */}
+      <div style={{ position: 'absolute', bottom: -15, right: -15, opacity: 0.05, color: 'var(--t4)', pointerEvents: 'none' }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 100 }}>data_thresholding</span>
+      </div>
+    </motion.div>
   );
 }
 
@@ -183,6 +228,8 @@ function AIBriefing({ user, progress, tasks }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { progress, tasks, paths, allAchs, A } = useApp();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -210,8 +257,61 @@ export default function Dashboard() {
   return (
     <div className="page">
       <style>{`
-        @keyframes numberUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes barGrow   { from{opacity:0;transform:scaleY(0.3)} to{opacity:1;transform:scaleY(1)} }
+        @keyframes numberUp    { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes barGrow      { from{opacity:0;transform:scaleY(0.3)} to{opacity:1;transform:scaleY(1)} }
+        @keyframes shimmer-wave { 0% { background-position: -100% 0; } 100% { background-position: 100% 0; } }
+        
+        @keyframes ai-breathe {
+          0%, 100% { border-color: rgba(96, 165, 250, 0.2); box-shadow: 0 0 15px rgba(96, 165, 250, 0.05); }
+          50% { border-color: rgba(167, 139, 250, 0.4); box-shadow: 0 0 25px rgba(167, 139, 250, 0.15); }
+        }
+        .ai-card-premium {
+          animation: ai-breathe 4s ease-in-out infinite;
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        @keyframes holographic {
+          0%, 100% { color: #60a5fa; opacity: 0.8; }
+          50% { color: #a78bfa; opacity: 1; }
+        }
+        .holographic-text {
+          animation: holographic 6s ease-in-out infinite;
+        }
+        @keyframes ai-pulse-soft {
+          0% { transform: scale(1); opacity: 0.3; }
+          100% { transform: scale(1.4); opacity: 0; }
+        }
+        .ai-pulse-ring {
+          position: absolute; inset: 0;
+          border-radius: 14px;
+          border: 1px solid rgba(96, 165, 250, 0.3);
+          animation: ai-pulse-soft 3s ease-out infinite;
+          pointer-events: none;
+        }
+
+        /* ── Light-mode sphere depth fix ── */
+        [data-theme="light"] .glass-sphere {
+          box-shadow:
+            0 8px 24px rgba(0, 0, 0, 0.12),
+            0 2px 6px rgba(0, 0, 0, 0.08),
+            inset 0 -10px 20px rgba(0, 0, 0, 0.07),
+            inset 0 8px 16px rgba(255, 255, 255, 0.9) !important;
+          border-color: rgba(0, 0, 0, 0.1) !important;
+          background:
+            radial-gradient(circle at 30% 20%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.3) 35%, transparent 55%),
+            radial-gradient(circle at 50% 80%, rgba(0,0,0,0.04), transparent 60%),
+            radial-gradient(circle at 50% 50%, var(--s2), var(--s3) 100%) !important;
+        }
+        [data-theme="light"] .glass-sphere .sphere-specular {
+          background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(255,255,255,0.4) 50%, transparent 80%) !important;
+          opacity: 0.7;
+        }
+        [data-theme="light"] .glass-sphere .sphere-refraction {
+          opacity: 0.3 !important;
+        }
+        [data-theme="light"] .sphere-floor {
+          background: radial-gradient(ellipse at center, rgba(0,0,0,0.12), transparent 80%) !important;
+          opacity: 0.7 !important;
+        }
       `}</style>
 
       {/* ─── HEADER ──────────────────────── */}
@@ -234,58 +334,149 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Network & XP Link */}
-        <Link to="/network" style={{ textDecoration: 'none' }}>
-          <div className="card card-hover shimmer-premium" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), var(--s2))', border: '1px solid rgba(59, 130, 246, 0.2)', boxShadow: 'var(--sh)' }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: 20, fontVariationSettings: "'FILL' 1" }}>public</span>
+        {/* Network & XP Link + Focus Action */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <Link to="/network" style={{ textDecoration: 'none' }}>
+            <div className="card card-hover shimmer-premium" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08), var(--s2))', border: '1px solid rgba(59, 130, 246, 0.2)', boxShadow: 'var(--sh)' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ color: '#3b82f6', fontSize: 20, fontVariationSettings: "'FILL' 1" }}>public</span>
+              </div>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>Global Rank</p>
+                <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)', lineHeight: 1 }}><span style={{ color: '#3b82f6' }}>#5</span> <span style={{ fontSize: 12, color: 'var(--t3)' }}>(18.2k XP)</span></p>
+              </div>
             </div>
-            <div>
-              <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 2 }}>Global Rank</p>
-              <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)', lineHeight: 1 }}><span style={{ color: '#3b82f6' }}>#5</span> <span style={{ fontSize: 12, color: 'var(--t3)' }}>(18.2k XP)</span></p>
-            </div>
-          </div>
-        </Link>
-      </div>
+          </Link>
 
-      {/* ─── QUICK FOCUS ACTION (PREMIUM PROMINENT) ─── */}
-      <div className="fadeup d1" style={{ marginBottom: 20 }}>
-        <Link to="/focus" style={{ textDecoration: 'none', display: 'block' }}>
-          <div className="card-hover" style={{ 
-            position: 'relative',
-            padding: '16px 24px', 
-            borderRadius: 'var(--r-xl)', 
-            background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.08) 0%, rgba(124, 58, 237, 0.02) 100%)', 
-            backgroundColor: 'var(--s2)',
-            border: '1px solid rgba(167, 139, 250, 0.2)', 
-            boxShadow: 'var(--sh), inset 0 1px 0 rgba(255,255,255,0.05)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: 16,
-            overflow: 'hidden'
-          }}>
-             {/* Animated Glow */}
-             <div style={{ position:'absolute', top: '-50%', left: '-10%', width: '60%', height: '200%', background: 'radial-gradient(ellipse at center, rgba(167,139,250,0.1), transparent 60%)', pointerEvents:'none' }} />
-             
-             <div style={{ display: 'flex', alignItems: 'center', gap: 16, position: 'relative', zIndex: 1 }}>
-               <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #a78bfa, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>
-                 <span className="material-symbols-outlined" style={{ fontSize: 22, color: '#fff', fontVariationSettings: "'FILL' 1" }}>center_focus_strong</span>
-               </div>
-               <div>
-                 <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--t1)', letterSpacing: '-0.01em', marginBottom: 2 }}>Enter Deep Focus</h3>
-                 <p style={{ fontSize: 13, color: 'var(--t3)', fontWeight: 500 }}>Start a timed session to eliminate all distractions.</p>
-               </div>
-             </div>
-             
-             <div style={{ position: 'relative', zIndex: 1, marginLeft: 'auto' }}>
-               <button className="btn" style={{ background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', padding: '10px 24px', borderRadius: 99, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 13 }}>
-                 Start Now
-               </button>
-             </div>
-          </div>
-        </Link>
+          <Link to="/focus" style={{ textDecoration: 'none' }}>
+            {isLight ? (
+              <motion.button 
+                whileHover={{ scale: 1.03, y: -3, boxShadow: '0 15px 35px -5px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.06), inset 0 2px 4px #fff' }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: "spring", stiffness: 400, damping: 15, mass: 0.8 }}
+                style={{ 
+                  width: '100%', 
+                  padding: '14px 20px', 
+                  borderRadius: 16, 
+                  background: 'linear-gradient(180deg, #ffffff 0%, #f9fafb 100%)',
+                  border: '1px solid rgba(0, 0, 0, 0.05)', 
+                  boxShadow: `
+                    0 8px 20px -4px rgba(0, 0, 0, 0.08),
+                    0 2px 8px -2px rgba(0, 0, 0, 0.04),
+                    inset 0 2px 4px rgba(255, 255, 255, 1),
+                    inset 0 -2px 4px rgba(0, 0, 0, 0.03)
+                  `,
+                  fontSize: 12.5, 
+                  fontWeight: 900, 
+                  color: '#0f172a',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: 12,
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.12em'
+                }}
+              >
+                {/* Advanced Technique 1: Slow-moving subsurface emerald glow */}
+                <motion.div 
+                  animate={{ x: ['-50%', '150%'] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                  style={{
+                    position: 'absolute', top: '-100%', left: 0, width: '150%', height: '300%',
+                    background: 'radial-gradient(circle at center, rgba(16, 185, 129, 0.06) 0%, transparent 40%)',
+                    zIndex: 0, pointerEvents: 'none'
+                  }}
+                />
+
+                {/* Advanced Technique 2: Intense focused specular highlight (glass diagonal reflection) */}
+                <div style={{ 
+                  position: 'absolute', top: 0, left: '-50%', width: '200%', height: '100%', 
+                  background: 'linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.7) 45%, rgba(255,255,255,1) 50%, rgba(255,255,255,0.7) 55%, transparent 65%)',
+                  transform: 'translateX(-100%)',
+                  animation: 'shimmer-wave 5s infinite cubic-bezier(0.4, 0, 0.2, 1)',
+                  zIndex: 0
+                }} />
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, zIndex: 1 }}>
+                  {/* Advanced Technique 3: Drop-shadowed Icon for tactile depth */}
+                  <span className="material-symbols-outlined" style={{ 
+                    fontSize: 20, 
+                    color: '#059669', 
+                    fontVariationSettings: "'FILL' 1",
+                    filter: 'drop-shadow(0 2px 3px rgba(5, 150, 105, 0.3))'
+                  }}>center_focus_strong</span>
+                  <span style={{ opacity: 0.9 }}>Enter Deep Focus</span>
+                </div>
+              </motion.button>
+            ) : (
+              <motion.button 
+                className="focus-btn-glass"
+                whileHover={{ scale: 1.03, y: -3 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 400, 
+                  damping: 15, 
+                  mass: 0.8,
+                  layout: { type: "spring", stiffness: 300, damping: 30 }
+                }}
+                style={{ 
+                  width: '100%', 
+                  padding: '14px 20px', 
+                  borderRadius: 16, 
+                  background: 'rgba(167, 139, 250, 0.08)', // Semi-transparent base
+                  backgroundColor: 'rgba(255, 255, 255, 0.01)',
+                  backdropFilter: 'blur(16px) saturate(180%)',
+                  border: '1px solid rgba(167, 139, 250, 0.3)', 
+                  borderTopColor: 'rgba(255, 255, 255, 0.4)', // Top highlight
+                  boxShadow: `
+                    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+                    0 0 20px rgba(167, 139, 250, 0.1),
+                    inset 0 1px 1px rgba(255, 255, 255, 0.1)
+                  `,
+                  fontSize: 12.5, 
+                  fontWeight: 900, 
+                  color: '#fff',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: 12,
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  textShadow: '0 0 10px rgba(167, 139, 250, 0.5)'
+                }}
+              >
+                {/* Animated Liquid Light Background */}
+                <div style={{ 
+                  position: 'absolute', inset: 0, 
+                  background: 'radial-gradient(circle at 50% 120%, rgba(167, 139, 250, 0.4), transparent 70%)',
+                  opacity: 0.6,
+                  zIndex: -1
+                }} />
+
+                {/* Shimmer Line */}
+                <div style={{ 
+                  position: 'absolute', inset: 0, 
+                  background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
+                  transform: 'translateX(-100%)',
+                  animation: 'shimmer-wave 4s infinite ease-in-out',
+                  zIndex: 0
+                }} />
+
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, zIndex: 1 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: '#a78bfa', fontVariationSettings: "'FILL' 1" }}>center_focus_strong</span>
+                  <span>Enter Deep Focus</span>
+                </div>
+              </motion.button>
+            )}
+          </Link>
+        </div>
       </div>
 
       {/* ─── AI BRIEFING ──────────────────── */}
@@ -293,36 +484,35 @@ export default function Dashboard() {
         <AIBriefing user={user} progress={progress} tasks={focusTasks}/>
       </div>
 
-      {/* ─── TOP BENTO GRID ───────────────── */}
-      <div className="reveal" style={{ display:'grid', gridTemplateColumns:'1fr', gap:16, marginBottom:20, borderRadius:'var(--r-xl)' }}>
+      {/* ─── HERO ROW: Active Path + 3D Spheres ───────────── */}
+      <div className="fadeup d2" style={{ display: 'flex', gap: 20, marginBottom: 24, alignItems: 'stretch', flexWrap: 'wrap' }}>
 
-        {/* Hero Card: Active path (Premium Compact Redesign) */}
-        <div className="fadeup d2 card-hover" style={{
-          borderRadius:'var(--r-xl)', overflow:'hidden',
-          background:'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-          backgroundColor:'var(--s2)',
-          border:'1px solid rgba(255,255,255,0.08)',
-          padding:'20px 24px',
-          position:'relative',
-          cursor:'pointer',
-          boxShadow: 'var(--sh-lg), inset 0 1px 0 rgba(255,255,255,0.05)',
+        {/* ── Left: Active Path Card (compressed horizontally, expanded vertically) ── */}
+        <div className="card card-hover" style={{
+          flex: '1 1 340px',
+          borderRadius: 'var(--r-xl)', 
+          padding: '24px 28px',
+          position: 'relative',
+          cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '24px'
+          gap: 24,
+          border: '1px solid var(--card-b)',
+          background: 'var(--s2)',
+          boxShadow: 'var(--sh-lg)'
         }} onClick={() => navigate('/paths')}>
           
-          {/* Subtle Ambient Glows */}
-          <div style={{ position:'absolute',top:'-20%',left:'-10%',width:'40%',height:'150%',background:'radial-gradient(ellipse at center, rgba(52,211,153,0.06), transparent 70%)',pointerEvents:'none' }}/>
-          <div style={{ position:'absolute',bottom:'-50%',right:'-10%',width:'50%',height:'150%',background:'radial-gradient(ellipse at center, rgba(59,130,246,0.05), transparent 70%)',pointerEvents:'none' }}/>
+          {/* Ambient Glows (kept subtle for hero feel) */}
+          <div style={{ position:'absolute',top:'-20%',left:'-10%',width:'50%',height:'150%',background:'radial-gradient(ellipse at center, rgba(52,211,153,0.05), transparent 70%)',pointerEvents:'none' }}/>
+          <div style={{ position:'absolute',bottom:'-50%',right:'-10%',width:'50%',height:'150%',background:'radial-gradient(ellipse at center, rgba(59,130,246,0.03), transparent 70%)',pointerEvents:'none' }}/>
 
-          {/* Left Content */}
-          <div style={{ flex:'1 1 300px', position:'relative', zIndex:1 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+          {/* ── Left: All text content ── */}
+          <div style={{ flex: 1, position:'relative', zIndex:1, display:'flex', flexDirection:'column', gap: 14 }}>
+            {/* Badge Row */}
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <div style={{ display:'inline-flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:6,background:'rgba(52,211,153,0.1)',border:'1px solid rgba(52,211,153,0.2)' }}>
                 <div style={{ width:5,height:5,borderRadius:'50%',background:'#34d399',animation:'pulseDot 2s ease-in-out infinite' }}/>
-                <span style={{ fontSize:9.5,fontWeight:800,color:'#34d399',textTransform:'uppercase',letterSpacing:'0.1em' }}>
+                <span style={{ fontSize:9.5,fontWeight:800,color:'#34d399',textTransform:'uppercase',letterSpacing:'0.12em' }}>
                   {activePath ? 'Active Path' : 'No Path'}
                 </span>
               </div>
@@ -333,70 +523,189 @@ export default function Dashboard() {
               )}
             </div>
             
-            <h2 style={{ fontSize:'clamp(1.2rem,2.5vw,1.6rem)',fontWeight:800,color:'var(--t1)',letterSpacing:'-0.01em',lineHeight:1.3,marginBottom:4 }}>
-              {activePath?.title || 'Start a Learning Path'}
-            </h2>
-            <p style={{ fontSize:13,color:'var(--t3)',lineHeight:1.5,marginBottom:16, maxWidth: '480px' }}>
-              {activePath?.goal || 'Create an AI-powered roadmap to master any skill'}
-            </p>
+            {/* Title + Description */}
+            <div>
+              <h2 style={{ fontSize:'clamp(1.3rem,2.5vw,1.6rem)',fontWeight:900,color:'var(--t1)',letterSpacing:'-0.02em',lineHeight:1.3,marginBottom:6 }}>
+                {activePath?.title || 'Start a Learning Path'}
+              </h2>
+              <p style={{ fontSize:13,color:'var(--t3)',lineHeight:1.6, fontWeight: 500 }}>
+                {activePath?.goal || 'Create an AI-powered roadmap to master any skill'}
+              </p>
+            </div>
 
-            <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-              <button className="btn btn-primary" style={{ padding:'10px 20px',fontSize:13, flexShrink:0, background: 'linear-gradient(135deg, var(--p), var(--p-cyan))', border: 'none', boxShadow: '0 4px 14px rgba(9,205,131,0.3)' }} onClick={e=>{e.stopPropagation();navigate(activePath?'/paths':'/paths');}}>
-                <span className="material-symbols-outlined" style={{ fontSize:16,fontVariationSettings:"'FILL' 1" }}>{activePath?'play_arrow':'add'}</span>
+            {/* CTA Button + Progress Bar (same row) */}
+            <div style={{ display:'flex', alignItems:'center', gap:32, flexWrap:'wrap', marginTop: 24 }}>
+              <button className="btn btn-primary shimmer-premium" style={{ 
+                padding:'12px 28px',fontSize:14, 
+                background: 'linear-gradient(135deg, #10b981, #06b6d4)', 
+                border: 'none', 
+                boxShadow: '0 8px 20px rgba(16,185,129,0.25)', 
+                borderRadius: 12, 
+                flexShrink:0,
+                fontWeight: 800,
+                letterSpacing: '0.01em'
+              }} onClick={e=>{e.stopPropagation();navigate(activePath?'/paths':'/paths');}}>
+                <span className="material-symbols-outlined" style={{ fontSize:18,fontVariationSettings:"'FILL' 1" }}>{activePath?'play_arrow':'add'}</span>
                 {activePath ? 'Resume Session' : 'Create Path'}
               </button>
-              
+
               {activePath && (
-                <div style={{ flex:1, maxWidth: 200 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4, fontSize:10, fontWeight:700, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'0.1em' }}>
+                <div style={{ flex:1, minWidth:120, maxWidth: 220 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6, fontSize:10, fontWeight:800, color:'var(--t4)', textTransform:'uppercase', letterSpacing:'0.12em' }}>
                     <span>Daily Focus</span>
-                    <span style={{ color:'var(--p)' }}>{Math.min(100, Math.round((progress?.thisWeekHours||0)/14*100))}%</span>
+                    <span style={{ color:'#10b981' }}>{Math.min(100, Math.round((progress?.thisWeekHours||0)/14*100))}%</span>
                   </div>
-                  <div className="progress-track" style={{ height:4, background: 'rgba(255,255,255,0.05)' }}>
-                    <div className="progress-fill" style={{ width:`${Math.min(100, (progress?.thisWeekHours||0)/14*100)}%`, background: 'var(--p)' }}/>
+                  <div className="progress-track" style={{ height:6, borderRadius:99, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                    <div className="progress-fill" style={{ 
+                      width:`${Math.min(100, (progress?.thisWeekHours||0)/14*100)}%`, 
+                      height:'100%', borderRadius:99, 
+                      background: 'linear-gradient(90deg, #10b981, #34d399)',
+                      boxShadow: '0 0 10px rgba(16,185,129,0.3)'
+                    }}/>
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Content - Compact Ring */}
+          {/* ── Right: Ring Progress ── */}
           {activePath && (
-            <div style={{ flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', padding: '0 10px', position:'relative', zIndex:1 }}>
-              <RingProgress pct={activePath.progress || 0} size={100} stroke={8} label="Done" color="#34d399"/>
+            <div style={{ flexShrink:0, position:'relative', zIndex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:8, filter: 'drop-shadow(0 0 12px rgba(52,211,153,0.15))' }}>
+              <RingProgress pct={activePath.progress || 0} size={120} stroke={10} label="Overall" color="#34d399"/>
             </div>
           )}
         </div>
-      </div>
 
-      {/* ─── STATS ROW ────────────────────── */}
-      <div className="grid-4 fadeup d3 tilt-container" style={{ marginBottom:20 }}>
-        {[
-          { icon:'local_fire_department', label:'Streak',        value:progress?.streak||0,   color:'#e9cd6e', sub:'days 🔥', glow:'rgba(233,205,110,0.2)', flame: (progress?.streak > 3) },
-          { icon:'schedule',             label:'This Week',      value:progress?.thisWeekHours||0, color:'#60a5fa', sub:'studied',  glow:'rgba(96,165,250,0.2)'  },
-          { icon:'task_alt',             label:'Completed',      value:tasks.filter(t=>t.status==='completed').length, color:'var(--p)', sub:'tasks', glow:'rgba(9,205,131,0.2)'   },
-          { icon:'emoji_events',         label:'Achievements',   value:earned,         color:'#a78bfa', sub:'earned',   glow:'rgba(167,139,250,0.2)', total:total },
-        ].map(({ icon, label, value, color, sub, glow, flame, total }, i) => (
-          <div key={label} className="card card-hover fadeup tilt-card" style={{ padding:'18px 16px', animationDelay:`${i*0.06}s`, position:'relative', overflow:'hidden' }}>
-            <div style={{ position:'absolute',top:-16,right:-16,width:70,height:70,borderRadius:'50%',background:`radial-gradient(${glow},transparent)`,pointerEvents:'none' }}/>
-            <div style={{ width:34,height:34,borderRadius:10,background:`${color}14`,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:12 }}>
-              <span className={`material-symbols-outlined ${flame ? 'flame-active' : ''}`} style={{ fontSize:18,color,fontVariationSettings:"'FILL' 1" }}>{icon}</span>
-            </div>
-            <p style={{ fontSize:'clamp(1.3rem,3vw,1.8rem)',fontWeight:800,color,letterSpacing:'-0.02em',lineHeight:1 }}>
-              <Counter value={value} />
-              {total !== undefined && <span style={{ fontSize:14, opacity:0.5 }}>/{total}</span>}
-            </p>
-            <p style={{ fontSize:11,color:'var(--t4)',marginTop:4,fontWeight:600 }}>{label}</p>
-          </div>
-        ))}
+        {/* ── Right: 2×2 Glass Sphere Grid ── */}
+        <div style={{
+          flex: '0 1 320px',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 12,
+          alignContent: 'center',
+          justifyItems: 'center'
+        }}>
+          {[
+            { icon:'local_fire_department', label:'Streak',      value:progress?.streak||0,   color:'#f0d890', colorMid:'rgba(240,216,144,0.08)', flame:(progress?.streak > 3), delay:0 },
+            { icon:'schedule',             label:'This Week',    value:progress?.thisWeekHours||0, color:'#93dffd', colorMid:'rgba(147,223,253,0.08)', delay:0.06 },
+            { icon:'task_alt',             label:'Completed',    value:tasks.filter(t=>t.status==='completed').length, color:'#6ee7b7', colorMid:'rgba(110,231,183,0.08)', delay:0.12 },
+            { icon:'emoji_events',         label:'Achievements', value:earned, color:'#d4c5ff', colorMid:'rgba(212,197,255,0.08)', total:total, delay:0.18 },
+          ].map(({ icon, label, value, color, colorMid, flame, total, delay }, i) => (
+            <motion.div
+              key={label}
+              initial={{ opacity: 0, y: 30, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20, delay }}
+              style={{ display:'flex', flexDirection:'column', alignItems:'center', cursor:'pointer' }}
+            >
+              {/* ── The Glassy 3D Sphere ── */}
+              <motion.div
+                className="glass-sphere"
+                whileHover={{ y: -10, scale: 1.06 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 20 }}
+                style={{
+                  width: 120, height: 120,
+                  borderRadius: '50%',
+                  position: 'relative',
+                  background: `
+                    radial-gradient(circle at 35% 25%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.05) 40%, transparent 60%),
+                    radial-gradient(circle at 50% 50%, color-mix(in srgb, ${color} 10%, var(--s2)), var(--s2) 100%)
+                  `,
+                  boxShadow: `
+                    0 15px 35px color-mix(in srgb, var(--t1) 12%, transparent),
+                    inset 0 -12px 25px color-mix(in srgb, ${color} 15%, transparent),
+                    inset 0 10px 20px rgba(255,255,255,0.15),
+                    inset 0 0 2px rgba(255,255,255,0.4)
+                  `,
+                  border: '1px solid color-mix(in srgb, var(--t1) 8%, transparent)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  overflow: 'hidden',
+                  zIndex: 1
+                }}
+              >
+                {/* Specular highlight */}
+                <div className="sphere-specular" style={{
+                  position: 'absolute',
+                  top: '10%', left: '20%',
+                  width: '50%', height: '30%',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.6) 0%, transparent 80%)',
+                  filter: 'blur(5px)',
+                  pointerEvents: 'none'
+                }} />
+
+                {/* Bottom edge glow */}
+                <div className="sphere-refraction" style={{
+                  position: 'absolute',
+                  bottom: '5%', right: '5%',
+                  width: '40%', height: '40%',
+                  borderRadius: '50%',
+                  background: `radial-gradient(circle at center, color-mix(in srgb, ${color} 20%, transparent), transparent 70%)`,
+                  filter: 'blur(10px)',
+                  opacity: 0.6,
+                  pointerEvents: 'none'
+                }} />
+
+                {/* Icon */}
+                <span
+                  className={`material-symbols-outlined ${flame ? 'flame-active' : ''}`}
+                  style={{
+                    fontSize: 28,
+                    color,
+                    fontVariationSettings: "'FILL' 1",
+                    position: 'relative', zIndex: 1,
+                    filter: `drop-shadow(0 2px 8px color-mix(in srgb, ${color} 40%, transparent))`
+                  }}
+                >{icon}</span>
+
+                {/* Value */}
+                <p style={{
+                  fontSize: 22, fontWeight: 900,
+                  color: 'var(--t1)',
+                  letterSpacing: '-0.03em',
+                  lineHeight: 1,
+                  position: 'relative', zIndex: 1
+                }}>
+                  <Counter value={value} />
+                  {total !== undefined && <span style={{ fontSize: 10, opacity: 0.4, fontWeight: 700 }}>/{total}</span>}
+                </p>
+
+                {/* Label */}
+                <p style={{
+                  fontSize: 8.5, fontWeight: 800,
+                  color: 'var(--t4)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.12em',
+                  lineHeight: 1,
+                  position: 'relative', zIndex: 1,
+                  marginTop: 1
+                }}>{label}</p>
+              </motion.div>
+
+              {/* Floor Shadow / Grounding Reflection */}
+              <div className="sphere-floor" style={{
+                marginTop: 8,
+                width: 40, height: 4,
+                background: `radial-gradient(ellipse at center, color-mix(in srgb, var(--t1) 15%, transparent), transparent 80%)`,
+                borderRadius: '50%',
+                filter: 'blur(2px)',
+                opacity: 0.5
+              }} />
+
+            </motion.div>
+          ))}
+        </div>
       </div>
 
       {/* ─── PROGRESS + ACTIVITY ──────────── */}
-      <Reveal>
         <div className="reveal" style={{ display:'grid', gridTemplateColumns:'1fr', gap:16, marginBottom:20 }}>
           {/* ... existing mastery ring and activity bars ... */}
-          <div className="card fadeup d4" style={{ padding:'22px 20px', display:'flex', alignItems:'center', gap:20, flexWrap:'wrap' }}>
-            <RingProgress pct={avgPct} size={140} stroke={10} label="Overall Mastery" sublabel={`${progress?.totalHours||0}h total`} color="var(--p-cyan)"/>
+          <div className="card fadeup d4" style={{ padding:'26px 24px', display:'flex', alignItems:'center', gap:24, flexWrap:'wrap' }}>
+            <RingProgress pct={avgPct} size={150} stroke={12} label="Overall Mastery" sublabel={`${progress?.totalHours||0}h total`} color="var(--p)"/>
             {/* ... rest of the content ... */}
             <div style={{ flex:1, minWidth:200 }}>
               <div style={{ display:'flex',alignItems:'center',gap:8,marginBottom:6 }}>
@@ -416,7 +725,15 @@ export default function Dashboard() {
                         <span style={{ fontSize:12,fontWeight:700,color:'var(--t2)' }}>{sub}</span>
                         <span style={{ fontSize:12,fontWeight:800,color:c }}>{data.progress}%</span>
                       </div>
-                      <div className="progress-track"><div className="progress-fill" style={{ width:`${data.progress}%`,background:`linear-gradient(90deg, color-mix(in srgb, ${c} 40%, transparent), ${c})` }}/></div>
+                      <div className="progress-track" style={{ height: 6, borderRadius: 99, background: 'var(--s3)' }}>
+                        <div className="progress-fill" style={{ 
+                          width:`${data.progress}%`, 
+                          height: '100%',
+                          borderRadius: 99,
+                          background:`linear-gradient(90deg, color-mix(in srgb, ${c} 50%, transparent), ${c})`,
+                          boxShadow: `0 0 10px color-mix(in srgb, ${c} 30%, transparent)` 
+                        }}/>
+                      </div>
                     </div>
                   );
                 })}
@@ -435,16 +752,62 @@ export default function Dashboard() {
               </Link>
             </div>
             <ActivityBars data={weekHours}/>
-            <div style={{ marginTop:16,padding:'14px 16px',borderRadius:'var(--r-md)',background:'linear-gradient(135deg,#a78bfa,#7c3aed)',display:'flex',alignItems:'center',gap:14 }}>
-              <span className="material-symbols-outlined" style={{ fontSize:22,color:'#fff',fontVariationSettings:"'FILL' 1" }}>bolt</span>
-              <div>
-                <p style={{ fontSize:22,fontWeight:800,color:'#fff',letterSpacing:'-0.02em',lineHeight:1 }}>{progress?.thisWeekHours||0} hrs</p>
-                <p style={{ fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.7)' }}>Deep Focus This Week</p>
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.015, y: -2 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              style={{ 
+                marginTop: 14,
+                padding: '16px 20px',
+                borderRadius: 'var(--r-lg)',
+                background: 'var(--glass)',
+                backdropFilter: 'blur(20px) saturate(160%)',
+                border: '1px solid var(--card-b)',
+                boxShadow: 'var(--sh), inset 0 1px 1px rgba(255,255,255,0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer'
+              }}
+            >
+              {/* Removed SVG noise overlay to prevent GPU rendering crashes */}
+
+              <div style={{ 
+                width: 42, height: 42, borderRadius: 12, 
+                background: 'var(--p-sub)', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                border: '1px solid var(--p-border)',
+                flexShrink: 0,
+                position: 'relative',
+                zIndex: 1
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--p)', fontVariationSettings: "'FILL' 1" }}>bolt</span>
               </div>
-            </div>
+              
+              <div style={{ flex: 1, position: 'relative', zIndex: 1 }}>
+                <p style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--p)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 2 }}>Focus Pulse</p>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <p style={{ fontSize: 24, fontWeight: 900, color: 'var(--t1)', letterSpacing: '-0.04em', lineHeight: 1 }}>{progress?.thisWeekHours || 0}</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t3)', letterSpacing: '-0.02em' }}>hours focused</p>
+                </div>
+              </div>
+
+              {/* Compact Functional Badge */}
+              <div style={{ 
+                display: 'flex', alignItems: 'center', gap: 6, 
+                padding: '6px 12px', borderRadius: 99, 
+                background: 'var(--s3)', border: '1px solid var(--card-b)',
+                position: 'relative', zIndex: 1
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--p)', animation: 'pulseDot 2s infinite' }} />
+                <span style={{ fontSize: 9, fontWeight: 800, color: 'var(--t2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Flow</span>
+              </div>
+            </motion.div>
           </div>
         </div>
-      </Reveal>
 
       {/* ─── TODAY'S FOCUS ────────────────── */}
       <div className="card fadeup d6" style={{ padding:'20px', marginBottom:20 }}>

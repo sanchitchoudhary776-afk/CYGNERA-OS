@@ -496,16 +496,65 @@ function AuraDial() {
               {isOpen ? 'close' : activeItem.icon}
             </span>
 
-            {/* Dashed outer ring */}
-            <div
+            {/* Rotating Dotted Aura Ring */}
+            <motion.div
+              animate={isOpen ? { rotate: 360 } : { rotate: 0 }}
+              transition={isOpen ? { duration: 20, repeat: Infinity, ease: "linear" } : { duration: 0.5 }}
               style={{
                 position: 'absolute',
-                inset: -6,
+                inset: -9,
                 borderRadius: '50%',
-                border: `1.5px dashed color-mix(in srgb, ${activeItem.color} 60%, transparent)`,
-                pointerEvents: 'none'
+                pointerEvents: 'none',
+                zIndex: -1
               }}
-            />
+            >
+              <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+                <defs>
+                  <linearGradient id="aura-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <motion.stop 
+                      offset="0%" 
+                      animate={{ 
+                        stopColor: [
+                          activeItem.color, 
+                          '#a855f7', // Luxury Purple
+                          '#3b82f6', // Premium Blue
+                          '#2dd4bf', // Teal
+                          activeItem.color
+                        ] 
+                      }}
+                      transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    <motion.stop 
+                      offset="100%" 
+                      animate={{ 
+                        stopColor: [
+                          '#3b82f6', 
+                          '#2dd4bf', 
+                          activeItem.color, 
+                          '#a855f7', 
+                          '#3b82f6'
+                        ] 
+                      }}
+                      transition={{ duration: 40, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                  </linearGradient>
+                </defs>
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="46"
+                  fill="none"
+                  stroke="url(#aura-ring-grad)"
+                  strokeWidth="2.5"
+                  strokeDasharray="1 6"
+                  strokeLinecap="round"
+                  style={{ 
+                    filter: 'drop-shadow(0 0 3px color-mix(in srgb, var(--p) 20%, transparent))',
+                    opacity: 0.7
+                  }}
+                />
+              </svg>
+            </motion.div>
 
             {/* Chat Trigger (Only if open) */}
             <AnimatePresence>

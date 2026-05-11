@@ -147,7 +147,7 @@ export default function AppLayout({ children }) {
         </div>
 
         {/* Page Content */}
-        <div key={location.pathname} style={{
+        <div key={`${location.pathname}-${theme}`} style={{
           animation: 'pageEnter 360ms cubic-bezier(0.4,0,0.2,1) both',
           minHeight: 'calc(100dvh - 64px)',
           paddingBottom: '120px'

@@ -10,6 +10,21 @@ import { usePremium, Counter } from '@components/ui/PremiumUI';
 
 const ALL_SUBS = ['All', ...SUBJECTS.slice(0,7)];
 
+const FONT_OPTIONS = [
+  { name: 'Plus Jakarta', value: "'Plus Jakarta Sans', sans-serif" },
+  { name: 'Inter', value: "'Inter', sans-serif" },
+  { name: 'Roboto', value: "'Roboto', sans-serif" },
+  { name: 'Poppins', value: "'Poppins', sans-serif" },
+  { name: 'Montserrat', value: "'Montserrat', sans-serif" },
+  { name: 'Open Sans', value: "'Open Sans', sans-serif" },
+  { name: 'Lato', value: "'Lato', sans-serif" },
+  { name: 'Playfair Display', value: "'Playfair Display', serif" },
+  { name: 'Lora', value: "'Lora', serif" },
+  { name: 'Fira Code', value: "'Fira Code', monospace" },
+  { name: 'JetBrains Mono', value: "'JetBrains Mono', monospace" },
+  { name: 'Patrick Hand', value: "'Patrick Hand', cursive" },
+];
+
 function QuickCapture({ onSave, onClose }) {
   const [content, setContent] = useState('');
   return (
@@ -96,7 +111,7 @@ function NoteCard({ note, onOpen, onDelete }) {
 function NoteEditor({ note, onSave, onClose }) {
   const isNew = !note?.id;
   const [form, setForm] = useState({ title:note?.title||'', content:note?.content||'', subject:note?.subject||'Web Dev', tags:note?.tags?.join(', ')||'' });
-  const [font, setFont] = useState(note?.font || 'var(--font-sans)');
+  const [font, setFont] = useState(note?.font || FONT_OPTIONS[0].value);
   const [ai,  setAi]    = useState(note?.aiEnhanced ? { flashcards:note.flashcards, summary:note.summary, concepts:note.concepts } : null);
   const [aiLoad, setAiLoad] = useState(false);
   const [viewMode, setViewMode] = useState('write'); // 'write' or 'read'
@@ -209,57 +224,82 @@ function NoteEditor({ note, onSave, onClose }) {
       <div onClick={e=>e.stopPropagation()} style={{ width:'100%',height:'100%',display:'flex',flexDirection:'column',background:'var(--bg)', overflow:'hidden', position:'relative' }}>
         
         {/* Top Header Bar */}
-        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 24px',borderBottom:'1px solid var(--surface-b)',background:'var(--s1)',flexShrink:0, zIndex:10 }}>
-          <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-            <button onClick={onClose} className="icon-btn" style={{ background:'transparent', border:'1px solid var(--surface-b)', borderRadius:'8px', width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 24px',height:68,borderBottom:'1px solid var(--surface-b)',background:'var(--s1)',flexShrink:0, zIndex:10 }}>
+          
+          {/* Left: Nav & Subject */}
+          <div style={{ display:'flex', gap:12, alignItems:'center', flexShrink:0 }}>
+            <button onClick={onClose} className="icon-btn" style={{ background:'var(--s2)', border:'1px solid var(--surface-b)', borderRadius:'10px', width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center' }}>
               <span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--t2)' }}>arrow_back</span>
             </button>
             <div style={{ width:1, height:20, background:'var(--surface-b)' }} />
-            <select value={form.subject} onChange={set('subject')} style={{ background:`color-mix(in srgb, ${subColor} 12%, transparent)`, color:subColor, border:`1px solid color-mix(in srgb, ${subColor} 25%, transparent)`, padding:'6px 14px', borderRadius:999, fontSize:12, fontWeight:700, outline:'none', cursor:'pointer' }}>
+            <select value={form.subject} onChange={set('subject')} style={{ background:`color-mix(in srgb, ${subColor} 12%, transparent)`, color:subColor, border:`1px solid color-mix(in srgb, ${subColor} 25%, transparent)`, padding:'0 14px', height:32, borderRadius:999, fontSize:12, fontWeight:700, outline:'none', cursor:'pointer' }}>
               {SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
             </select>
-            <input value={form.tags} onChange={set('tags')} placeholder="Add tags..." style={{ background:'transparent', border:'none', color:'var(--t4)', fontSize:13, fontWeight:600, outline:'none', width:120 }} />
-            
-            <div style={{ width:1, height:20, background:'var(--surface-b)' }} />
-            
-            {/* Formatting Toolbar */}
-            <div style={{ display:'flex', alignItems:'center', gap:2, background:'var(--s2)', padding:'4px 6px', borderRadius:8, border:'1px solid var(--surface-b)' }}>
-              <select value={font} onChange={e=>setFont(e.target.value)} style={{ background:'transparent', border:'none', color:'var(--t2)', fontSize:12, fontWeight:600, outline:'none', cursor:'pointer', padding:'0 4px', maxWidth: 90 }}>
-                <option value="var(--font-sans)">Sans-serif</option>
-                <option value="Georgia, serif">Serif</option>
-                <option value="monospace">Monospace</option>
-              </select>
-              <div style={{ width:1, height:14, background:'var(--surface-b)', margin:'0 4px' }} />
-              <button onClick={()=>applyFormat('**')} title="Bold" className="icon-btn" style={{ background:'transparent', border:'none', width:26, height:26, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t2)', cursor:'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:16, fontVariationSettings:"'wght' 700" }}>format_bold</span>
-              </button>
-              <button onClick={()=>applyFormat('*')} title="Italic" className="icon-btn" style={{ background:'transparent', border:'none', width:26, height:26, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t2)', cursor:'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:16 }}>format_italic</span>
-              </button>
+          </div>
+          
+          {/* Middle: Toolbar & Status */}
+          <div style={{ display:'flex', alignItems:'center', gap:4, background:'var(--s2)', padding:'4px 12px', borderRadius:12, border:'1px solid var(--surface-b)', height:44 }}>
+            <select value={font} onChange={e=>setFont(e.target.value)} style={{ background:'transparent', border:'none', color:'var(--t2)', fontSize:12, fontWeight:700, outline:'none', cursor:'pointer', padding:'0 8px', minWidth: 100 }}>
+              {FONT_OPTIONS.map(f => (
+                <option key={f.value} value={f.value} style={{ background:'var(--s1)', color:'var(--t1)' }}>{f.name}</option>
+              ))}
+            </select>
+            <div style={{ width:1, height:16, background:'var(--surface-b)', margin:'0 4px' }} />
+            <button onClick={()=>applyFormat('**')} title="Bold" className="icon-btn" style={{ background:'transparent', border:'none', width:32, height:32, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t2)', cursor:'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18, fontVariationSettings:"'wght' 700" }}>format_bold</span>
+            </button>
+            <button onClick={()=>applyFormat('*')} title="Italic" className="icon-btn" style={{ background:'transparent', border:'none', width:32, height:32, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--t2)', cursor:'pointer' }}>
+              <span className="material-symbols-outlined" style={{ fontSize:18 }}>format_italic</span>
+            </button>
+            <div style={{ width:1, height:16, background:'var(--surface-b)', margin:'0 4px' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:12, paddingLeft:4 }}>
+              <span style={{ fontSize:10, color:'var(--t4)', fontWeight:800, display:'flex', alignItems:'center', gap:4, letterSpacing:'0.05em' }}>
+                {saveStatus === 'Saving...' ? <div className="spinner" style={{width:10,height:10,borderWidth:2,borderColor:'var(--t4)',borderTopColor:'transparent'}}/> : <span className="material-symbols-outlined" style={{fontSize:14,color:'var(--t4)'}}>cloud_done</span>}
+                {saveStatus.toUpperCase()}
+              </span>
+              <span style={{ fontSize:10, color:'var(--t4)', fontWeight:800, letterSpacing:'0.05em' }}>{wordCount(form.content)} WORDS</span>
             </div>
           </div>
           
-          <div style={{ display:'flex',gap:12,alignItems:'center' }}>
-            <span style={{ fontSize:12, color:'var(--t4)', fontWeight:600, marginRight:12, display:'flex', alignItems:'center', gap:6 }}>
-              {saveStatus === 'Saving...' ? <div className="spinner" style={{width:10,height:10,borderWidth:2,borderColor:'var(--t4)',borderTopColor:'transparent'}}/> : <span className="material-symbols-outlined" style={{fontSize:14,color:'var(--t4)'}}>cloud_done</span>}
-              {saveStatus}
-            </span>
-            <span style={{ fontSize:12, color:'var(--t4)', fontWeight:600, marginRight:12 }}>{wordCount(form.content)} words</span>
-            
-            <div style={{ display:'flex', background:'var(--s2)', borderRadius:8, padding:4, border:'1px solid var(--surface-b)' }}>
-              <button onClick={()=>setViewMode('write')} style={{ padding:'6px 16px', borderRadius:6, border:'none', background:viewMode==='write'?'var(--s3)':'transparent', color:viewMode==='write'?'var(--t1)':'var(--t4)', fontWeight:700, fontSize:12, cursor:'pointer', transition:'all 150ms' }}>Edit</button>
-              <button onClick={()=>setViewMode('read')} style={{ padding:'6px 16px', borderRadius:6, border:'none', background:viewMode==='read'?'var(--s3)':'transparent', color:viewMode==='read'?'var(--t1)':'var(--t4)', fontWeight:700, fontSize:12, cursor:'pointer', transition:'all 150ms' }}>Read</button>
+          {/* Right: Actions */}
+          <div style={{ display:'flex', gap:10, alignItems:'center', flexShrink:0 }}>
+            <div style={{ display:'flex', background:'var(--s2)', borderRadius:12, padding:4, border:'1px solid var(--surface-b)', height:40 }}>
+              <button onClick={()=>setViewMode('write')} style={{ padding:'0 16px', borderRadius:8, border:'none', background:viewMode==='write'?'var(--s3)':'transparent', color:viewMode==='write'?'var(--t1)':'var(--t4)', fontWeight:800, fontSize:12, cursor:'pointer', transition:'all 200ms' }}>Edit</button>
+              <button onClick={()=>setViewMode('read')} style={{ padding:'0 16px', borderRadius:8, border:'none', background:viewMode==='read'?'var(--s3)':'transparent', color:viewMode==='read'?'var(--t1)':'var(--t4)', fontWeight:800, fontSize:12, cursor:'pointer', transition:'all 200ms' }}>Read</button>
             </div>
 
-            <div style={{ width:1, height:20, background:'var(--surface-b)' }} />
+            <div style={{ width:1, height:24, background:'var(--surface-b)', margin:'0 2px' }} />
 
             {AI.enabled() && (
-              <button onClick={() => { if(!ai) runAI(); setShowSidebar(!showSidebar); }} disabled={aiLoad && !ai} style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 18px',borderRadius:8,border:'none',background:'linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(6, 182, 212, 0.15))',color:'var(--t1)',fontWeight:800,fontSize:13,cursor:'pointer',boxShadow:'inset 0 0 0 1px rgba(124, 58, 237, 0.4)',transition:'all 200ms ease',opacity:(aiLoad && !ai)?0.6:1 }}>
-                {(aiLoad && !ai)?<div className="spinner" style={{ width:14,height:14,borderWidth:2,borderColor:'var(--nebula-purple)',borderTopColor:'transparent' }}/>:<span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--nebula-purple)', fontVariationSettings:"'FILL' 1" }}>{showSidebar ? 'right_panel_close' : 'auto_awesome'}</span>}
-                {ai ? (showSidebar ? 'Hide AI' : 'Show AI') : 'Generate AI Notes'}
+              <button 
+                onClick={() => { if(!ai) runAI(); setShowSidebar(!showSidebar); }} 
+                disabled={aiLoad && !ai} 
+                style={{ 
+                  height:40, display:'flex', alignItems:'center', gap:8, padding:'0 16px', borderRadius:12, border:'none', 
+                  background:'linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(6, 182, 212, 0.1))', color:'var(--t1)', 
+                  fontWeight:800, fontSize:13, cursor:'pointer', boxShadow:'inset 0 0 0 1px rgba(124, 58, 237, 0.3)', 
+                  transition:'all 240ms var(--ease)', opacity:(aiLoad && !ai)?0.6:1 
+                }}
+                onMouseOver={e=>e.currentTarget.style.background='linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(6, 182, 212, 0.15))'}
+                onMouseOut={e=>e.currentTarget.style.background='linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(6, 182, 212, 0.1))'}
+              >
+                {(aiLoad && !ai)?<div className="spinner" style={{ width:14,height:14,borderWidth:2,borderColor:'var(--nebula-purple)',borderTopColor:'transparent' }}/>:<span className="material-symbols-outlined" style={{ fontSize:18, color:'var(--nebula-purple)', fontVariationSettings:"'FILL' 1" }}>{showSidebar ? 'right_panel_close' : 'auto_awesome'}</span>}
+                {ai ? (showSidebar ? 'Hide' : 'AI') : 'AI Insights'}
               </button>
             )}
-            <button onClick={() => save()} className="btn btn-primary" style={{ padding:'8px 24px', borderRadius:8, background: `linear-gradient(135deg, ${subColor}, color-mix(in srgb, ${subColor} 70%, black))`, border:'none', fontSize:13, fontWeight:800 }}>
+
+            <button 
+              onClick={() => save()} 
+              style={{ 
+                height:40, padding:'0 24px', borderRadius:12, 
+                background: `linear-gradient(135deg, ${subColor}, color-mix(in srgb, ${subColor} 70%, black))`, 
+                border:'none', fontSize:13, fontWeight:900, color:'#00150a', cursor:'pointer', 
+                transition:'all 240ms var(--bounce)', display:'flex', alignItems:'center', justifyContent:'center',
+                boxShadow:`0 4px 15px color-mix(in srgb, ${subColor} 25%, transparent)`
+              }}
+              onMouseOver={e=>{e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.filter='brightness(1.1)'}}
+              onMouseOut={e=>{e.currentTarget.style.transform='none'; e.currentTarget.style.filter='none'}}
+            >
               Done
             </button>
           </div>

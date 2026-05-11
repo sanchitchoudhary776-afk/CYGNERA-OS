@@ -58,16 +58,16 @@ export const ls = {
 
 // ── Colors ──────────────────────────────────
 export const COLORS = {
-  'Web Dev':     'var(--p)',
-  'Mathematics': '#60a5fa',
-  'Biology':     '#a78bfa',
-  'Physics':     '#fb923c',
-  'Chemistry':   '#34d399',
-  'English':     '#f472b6',
-  'History':     '#fbbf24',
-  'Economics':   '#a3e635',
-  'Computer Sc.':'#22d3ee',
-  'Other':       '#94a3b8',
+  'Web Dev':     'var(--p)', // Emerald
+  'Mathematics': '#7dd3fc', // Sky Blue
+  'Biology':     '#c4b5fd', // Soft Purple
+  'Physics':     '#fda4af', // Rose
+  'Chemistry':   '#5eead4', // Teal
+  'English':     '#f0abfc', // Lavender
+  'History':     '#fde047', // Soft Yellow
+  'Economics':   '#bef264', // Lime
+  'Computer Sc.':'#67e8f9', // Cyan
+  'Other':       'var(--t4)',
 };
 export const subjectColor    = (s) => COLORS[s] || 'var(--p)';
 export const SUBJECT_COLORS  = COLORS; // alias
