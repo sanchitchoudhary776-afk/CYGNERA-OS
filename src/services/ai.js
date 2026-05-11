@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════
 //  CYGNERA OS · AI SERVICE — Groq (Llama 3.3 70B + Llama 3.1 8B)
+//  Native fetch implementation — No SDK dependency
 //  Smart model routing: 70B for deep insights, 8B for fast tasks
 // ═══════════════════════════════════════════════════════════════
-import Groq from 'groq-sdk';
 const MODELS = {
   fast: 'llama-3.1-8b-instant',      // Groq — fast
   deep: 'llama-3.3-70b-versatile',   // Groq — deep
