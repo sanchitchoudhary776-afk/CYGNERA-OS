@@ -9,85 +9,57 @@ const MODELS = {
   ultra: 'llama-3.3-70b-versatile',   // Groq — deep (Fallback for ultra requests)
 };
 
-// ─── Client ─────────────────────────────────────────────────
-const getClient = () => {
-  const envKey = import.meta.env.VITE_GROQ_API_KEY;
-  
-  if (!envKey) {
-    console.error('[AI] CRITICAL: VITE_GROQ_API_KEY is undefined. Make sure to add it to your Vercel/Production environment variables.');
-    return null;
-  }
-
-  if (envKey === 'your_key_here' || envKey === 'your_groq_api_key_here') {
-    console.warn('[AI] Placeholder key detected. AI features will be disabled.');
-    return null;
-  }
-
-  const keys = envKey.split(',').map(k => k.trim()).filter(Boolean);
-  if (keys.length === 0) {
-    console.error('[AI] No valid keys found in VITE_GROQ_API_KEY string.');
-    return null;
-  }
-
-  const key = keys[Math.floor(Math.random() * keys.length)];
-  if (import.meta.env.DEV) {
-    console.log(`[AI] Initializing Groq client with key: ${key.slice(0, 8)}...`);
-  }
-  
-  try {
-    return new Groq({ apiKey: key, dangerouslyAllowBrowser: true });
-  } catch (err) {
-    console.error('[AI] Failed to initialize Groq SDK:', err);
-    return null;
-  }
-};
+// ─── Utilities ──────────────────────────────────────────────
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export const AI = {
   enabled: () => {
     const groq = import.meta.env.VITE_GROQ_API_KEY;
-    const isSet = k => !!(k && k !== 'your_key_here' && k !== 'your_groq_api_key_here');
-    return isSet(groq);
+    return !!(groq && groq !== 'your_key_here' && groq !== 'your_groq_api_key_here');
   },
-  hasGemini: () => false // Kept for backwards compatibility if needed, but always false
+  hasGemini: () => false
 };
 
-// ─── Rate Limit Handler ─────────────────────────────────────
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+// ─── Client ─────────────────────────────────────────────────
+// ─── Native Fetch Implementation (Bypasses SDK issues in Production) ─────────
+const callGroqAPI = async (payload, apiKey) => {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+  }
+
+  return await response.json();
+};
 
 const callWithRetry = async (params, retries = 3) => {
+  const envKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!envKey || envKey.includes('your_key_here')) {
+    console.error('[AI] Key missing or placeholder in environment.');
+    return null;
+  }
+
+  const keys = envKey.split(',').map(k => k.trim()).filter(Boolean);
+  
   for (let i = 0; i < retries; i++) {
-    // Get a fresh client every attempt (will rotate keys if multiple are provided)
-    const client = getClient();
-    if (!client) return null;
-
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    
     try {
-      return await client.chat.completions.create(params);
+      return await callGroqAPI(params, key);
     } catch (err) {
-      // 🚨 Groq/Llama 400 Error Interceptor
-      if (err?.message?.includes('failed_generation')) {
-        try {
-          const jsonStr = err.message.substring(err.message.indexOf('{'));
-          const errObj = JSON.parse(jsonStr);
-          if (errObj?.error?.failed_generation) {
-            console.warn('[AI] Intercepted 400 Tool Error. Recovering payload...');
-            return {
-              choices: [{
-                message: { content: errObj.error.failed_generation, tool_calls: null }
-              }]
-            };
-          }
-        } catch (e) {
-          // fallback
-        }
-      }
-
-      if (err?.status === 429 && i < retries - 1) {
-        // Shorter wait because we might rotate to a fresh, un-limited key
-        const wait = 500;
-        console.warn(`[AI] Rate limited. Rotating key and retrying in ${wait}ms...`);
-        await sleep(wait);
-      } else {
-        console.error('[AI]', err?.message || err);
+      console.error(`[AI] Attempt ${i+1} failed:`, err.message);
+      
+      if (err.message.includes('429') && i < retries - 1) {
+        await sleep(1000);
+      } else if (i === retries - 1) {
         return null;
       }
     }
@@ -97,23 +69,19 @@ const callWithRetry = async (params, retries = 3) => {
 
 // ─── Core Callers ───────────────────────────────────────────
 const call = async (messages, { model = MODELS.fast, temp = 0.7, max = 1000 } = {}) => {
-  // ─── 1. Validate/Clean Messages for OpenAI/Groq format ───
   let cleanMessages = messages.map(m => ({
     role: m.role === 'model' ? 'assistant' : m.role,
     content: m.content
   }));
 
-  // Ensure first message is NOT an assistant message (Groq/OpenAI requirement)
   while (cleanMessages.length > 0 && cleanMessages[0].role === 'assistant') {
     cleanMessages.shift();
   }
 
-  // If no messages left or first isn't system/user, prepend a basic system prompt
   if (cleanMessages.length === 0 || (cleanMessages[0].role !== 'system' && cleanMessages[0].role !== 'user')) {
     cleanMessages.unshift({ role: 'system', content: 'You are a helpful study assistant.' });
   }
 
-  // ─── 2. Route to Groq ───
   const groqModel = model === MODELS.ultra ? MODELS.deep : model;
   const res = await callWithRetry({
     model: groqModel,
@@ -121,6 +89,7 @@ const call = async (messages, { model = MODELS.fast, temp = 0.7, max = 1000 } = 
     temperature: temp,
     max_tokens: max,
   });
+  
   return res?.choices?.[0]?.message?.content?.trim() ?? null;
 };
 
@@ -418,9 +387,6 @@ export async function auraChat(messages, userContext) {
     - Keep responses very concise. No markdown headers or bolding.`;
 
   try {
-    const client = getClient();
-    if (!client) return { error: 'Groq API Key missing. Please provide it in the .env file.' };
-
     const groqRes = await callWithRetry({
       model: MODELS.fast,
       messages: [
