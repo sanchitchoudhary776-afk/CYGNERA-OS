@@ -1,9 +1,10 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp }   from '@context/AppContext';
 import { summarizeVideo, AI } from '@services/ai';
 import { SUBJECT_COLORS, SUBJECTS, fmt } from '@utils';
 import toast from 'react-hot-toast';
 import { usePremium, Counter } from '@components/ui/PremiumUI';
+import { Portal } from '@components/ui';
 
 function extractVideoInfo(url) {
   if (!url) return null;
@@ -62,7 +63,7 @@ function AddModal({ onClose, onSave, existingPlaylists }) {
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px',borderBottom:'1px solid rgba(9,205,131,0.07)',flexShrink:0 }}>
           <div style={{ display:'flex',alignItems:'center',gap:10 }}>
             <span className="material-symbols-outlined" style={{ fontSize:18,color:'#ff6b6b',fontVariationSettings:"'FILL' 1" }}>video_library</span>
-            <span style={{ fontSize:16,fontWeight:800,color:'var(--t1)' }}>Add Video to Library</span>
+            <span style={{ fontSize:15,fontWeight:800,color:'var(--t1)' }}>Add Video to Library</span>
           </div>
           <button onClick={onClose} className="icon-btn"><span className="material-symbols-outlined" style={{ fontSize:20 }}>close</span></button>
         </div>
@@ -71,10 +72,10 @@ function AddModal({ onClose, onSave, existingPlaylists }) {
         <div style={{ display:'flex', padding:'16px 20px 0' }}>
           <div style={{ display:'flex', gap:4, background:'var(--s1)', padding:4, borderRadius:'var(--r-md)', width:'100%' }}>
             <button onClick={()=>{setTab('link'); setUrl(''); setFile(null); setPreview(null); setTitle('');}} style={{ flex:1, padding:'8px', borderRadius:'var(--r-sm)', background:tab==='link'?'var(--s3)':'transparent', border:'none', color:tab==='link'?'var(--t1)':'var(--t3)', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
-              <span className="material-symbols-outlined" style={{ fontSize:16 }}>link</span> Web Link / Drive
+              <span className="material-symbols-outlined" style={{ fontSize:15 }}>link</span> Web Link / Drive
             </button>
             <button onClick={()=>{setTab('local'); setUrl(''); setFile(null); setPreview(null); setTitle('');}} style={{ flex:1, padding:'8px', borderRadius:'var(--r-sm)', background:tab==='local'?'var(--s3)':'transparent', border:'none', color:tab==='local'?'var(--t1)':'var(--t3)', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all 0.2s' }}>
-              <span className="material-symbols-outlined" style={{ fontSize:16 }}>folder_open</span> Local File
+              <span className="material-symbols-outlined" style={{ fontSize:15 }}>folder_open</span> Local File
             </button>
           </div>
         </div>
@@ -256,7 +257,7 @@ function AISummaryModal({ video, onClose }) {
                   </div>
                   <div>
                     <p style={{ fontSize:11,fontWeight:900,color:'#8b5cf6',textTransform:'uppercase',letterSpacing:'0.12em',marginBottom:6 }}>Master Insight</p>
-                    <p style={{ fontSize:16,color:'var(--t1)',fontWeight:900,lineHeight:1.5,letterSpacing:'-0.01em' }}>{data.takeaway}</p>
+                    <p style={{ fontSize:15,color:'var(--t1)',fontWeight:900,lineHeight:1.5,letterSpacing:'-0.01em' }}>{data.takeaway}</p>
                   </div>
                 </div>
               </section>
@@ -273,12 +274,13 @@ function AISummaryModal({ video, onClose }) {
 }
 
 // ── Video Card ─────────────────────────────────
-function VideoCard({ video, onToggle, onNote, onDelete }) {
+function VideoCard({ video, onToggle, onNote, onDelete, onCreateNote, onCreateTask, onScheduleStudy }) {
   const [editNote,   setEditNote]   = useState(false);
   const [note,       setNote]       = useState(video.notes||'');
   const [showPlayer, setShowPlayer] = useState(false);
   const [showAI,     setShowAI]     = useState(false);
   const [imgError,   setImgError]   = useState(false);
+  const [sideNote,   setSideNote]   = useState('');
   const { askConfirm } = usePremium();
   const color = SUBJECT_COLORS[video.subject]||'var(--p)';
   
@@ -345,7 +347,7 @@ function VideoCard({ video, onToggle, onNote, onDelete }) {
           ) : video.notes ? (
             <div style={{ marginBottom:14,padding:'10px 12px',borderRadius:'var(--r-md)',background:'var(--s3)',borderLeft:`2px solid ${color}`, position:'relative' }}>
               <p style={{ fontSize:11.5,color:'var(--t2)',lineHeight:1.55, fontWeight:500 }}>{video.notes}</p>
-              <button onClick={()=>setEditNote(true)} style={{ position:'absolute', top:4, right:4, fontSize:16, color:'var(--t4)', background:'none', border:'none', cursor:'pointer' }} className="material-symbols-outlined">edit_note</button>
+              <button onClick={()=>setEditNote(true)} style={{ position:'absolute', top:4, right:4, fontSize:15, color:'var(--t4)', background:'none', border:'none', cursor:'pointer' }} className="material-symbols-outlined">edit_note</button>
             </div>
           ) : (
             <button onClick={()=>setEditNote(true)} style={{ fontSize:11,fontWeight:700,color:'var(--t4)',background:'var(--s3)',border:'1px dashed var(--surface-b)',borderRadius:'var(--r-md)', width:'100%', cursor:'pointer',marginBottom:14,padding:'8px',display:'flex',alignItems:'center',justifyContent:'center',gap:6 }}>
@@ -358,13 +360,13 @@ function VideoCard({ video, onToggle, onNote, onDelete }) {
         <div style={{ display:'flex',gap:6, marginBottom:6 }}>
           <button onClick={()=>onToggle(video.id)}
             style={{ flex:1.2,display:'flex',alignItems:'center',justifyContent:'center',gap:5,padding:'8px 10px',borderRadius:'var(--r-md)',border:`1px solid ${video.watched?'rgba(9,205,131,0.3)':'var(--surface-b)'}`,background:video.watched?'rgba(9,205,131,0.08)':'var(--s3)',color:video.watched?'#10b981':'var(--t2)',cursor:'pointer',fontSize:11,fontWeight:800,transition:'all 180ms ease' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16,fontVariationSettings:video.watched?"'FILL' 1":"'FILL' 0" }}>{video.watched?'task_alt':'circle'}</span>
+            <span className="material-symbols-outlined" style={{ fontSize:15,fontVariationSettings:video.watched?"'FILL' 1":"'FILL' 0" }}>{video.watched?'task_alt':'circle'}</span>
             {video.watched?'Watched':'Mark Done'}
           </button>
           
           <button onClick={()=>setShowAI(true)}
             style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:5,padding:'8px 10px',borderRadius:'var(--r-md)',border:'1px solid rgba(139,92,246,0.3)',color:'#8b5cf6',fontSize:11,fontWeight:800,background:'rgba(139,92,246,0.04)',transition:'all 180ms ease' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16,fontVariationSettings:"'FILL' 1" }}>auto_awesome</span>
+            <span className="material-symbols-outlined" style={{ fontSize:15,fontVariationSettings:"'FILL' 1" }}>auto_awesome</span>
             AI Guide
           </button>
         </div>
@@ -373,57 +375,127 @@ function VideoCard({ video, onToggle, onNote, onDelete }) {
         <div style={{ display:'flex',gap:6, alignItems:'center' }}>
           <a href={video.url} target="_blank" rel="noreferrer"
             style={{ flex:1, display:'flex',alignItems:'center',justifyContent:'center',gap:5,padding:'7px 10px',borderRadius:'var(--r-md)',border:'1px solid var(--surface-b)',color:'var(--t3)',textDecoration:'none',fontSize:11,fontWeight:700,background:'var(--s4)',transition:'all 180ms ease' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16, color:'#ff4e4e', fontVariationSettings:"'FILL' 1" }}>play_circle</span>
+            <span className="material-symbols-outlined" style={{ fontSize:15, color:'#ff4e4e', fontVariationSettings:"'FILL' 1" }}>play_circle</span>
             Open External
           </a>
           
           <button onClick={handleDelete} className="icon-btn" style={{ background:'var(--s4)', border:'1px solid var(--surface-b)', width:32, height:32, flexShrink:0 }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--danger)' }}>delete</span>
+            <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--danger)' }}>delete</span>
+          </button>
+        </div>
+
+        {/* Actions Row 3: Cross-Feature Links */}
+        <div style={{ display:'flex',gap:6, marginTop:2 }}>
+          <button onClick={()=>onCreateTask(`Review: ${video.title}`, video.subject)}
+            style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:5,padding:'7px 10px',borderRadius:'var(--r-md)',border:'1px solid rgba(96,165,250,0.2)',color:'#60a5fa',fontSize:11,fontWeight:700,background:'rgba(96,165,250,0.04)',transition:'all 180ms ease',cursor:'pointer' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:14 }}>add_task</span>
+            Create Task
+          </button>
+          <button onClick={()=>onScheduleStudy(video.subject, video.title)}
+            style={{ flex:1,display:'flex',alignItems:'center',justifyContent:'center',gap:5,padding:'7px 10px',borderRadius:'var(--r-md)',border:'1px solid rgba(251,146,60,0.2)',color:'#fb923c',fontSize:11,fontWeight:700,background:'rgba(251,146,60,0.04)',transition:'all 180ms ease',cursor:'pointer' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:14 }}>event</span>
+            Schedule
           </button>
         </div>
       </div>
 
       {/* AI Guide Modal */}
-      {showAI && <AISummaryModal video={video} onClose={()=>setShowAI(false)}/>}
-
-      {/* Inline player */}
+      {showAI && <Portal><AISummaryModal video={video} onClose={()=>setShowAI(false)}/></Portal>}
+      
+      {/* Learning Studio — Split Video Player + Notes Sidebar */}
       {showPlayer && info && (
-        <div onClick={()=>setShowPlayer(false)} style={{ position:'fixed',inset:0,zIndex:110,display:'flex',alignItems:'center',justifyContent:'center',padding:20,background:'var(--overlay)',animation:'modalFadeIn 220ms ease both' }}>
-          <div onClick={e=>e.stopPropagation()} style={{ width:'100%',maxWidth:860,borderRadius:'var(--r-xl)',overflow:'hidden',boxShadow:'0 0 80px rgba(0,0,0,0.9)',animation:'scaleIn 280ms var(--bounce)', background:'#000' }}>
-            <div style={{ position:'relative',paddingTop:'56.25%',background:'#000' }}>
+        <Portal>
+          <div onClick={()=>setShowPlayer(false)} style={{ position:'fixed',inset:0,zIndex:110,display:'flex',alignItems:'center',justifyContent:'center',padding:16,background:'var(--overlay)',animation:'modalFadeIn 220ms ease both' }}>
+            <div onClick={e=>e.stopPropagation()} className="video-studio-modal" style={{ width:'100%',maxWidth:1200,height:'min(84vh, 740px)',borderRadius:'var(--r-xl)',overflow:'hidden',boxShadow:'0 0 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.05)',animation:'scaleIn 280ms var(--bounce)', background:'var(--s2)', display:'flex' }}>
               
-              {(info.type === 'youtube' || info.type === 'drive') && (
-                <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'var(--s3)',animation:'pulse 1.5s infinite ease-in-out' }}>
-                  <div className="spinner" style={{ width:24,height:24,borderWidth:3,borderColor:'var(--p) transparent var(--p) transparent' }}/>
-                  <p style={{ fontSize:11,color:'var(--t4)',marginTop:12,fontWeight:700 }}>Loading Studio…</p>
+              {/* Left: Video Player */}
+              <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#000', minWidth:0, position:'relative' }}>
+                <div style={{ position:'relative', flex:1, background:'#000' }}>
+                  {(info.type === 'youtube' || info.type === 'drive') && (
+                    <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:'var(--s3)',animation:'pulse 1.5s infinite ease-in-out',zIndex:0 }}>
+                      <div className="spinner" style={{ width:24,height:24,borderWidth:3,borderColor:'var(--p) transparent var(--p) transparent' }}/>
+                      <p style={{ fontSize:11,color:'var(--t4)',marginTop:12,fontWeight:700 }}>Loading Studio…</p>
+                    </div>
+                  )}
+                  {info.type === 'youtube' && (
+                    <iframe src={`https://www.youtube.com/embed/${info.id}?autoplay=1`} title={video.title}
+                      onLoad={(e) => { if(e.target.previousSibling) e.target.previousSibling.style.display = 'none'; }}
+                      style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none',zIndex:1 }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen/>
+                  )}
+                  {info.type === 'drive' && (
+                    <iframe src={info.embedUrl} title={video.title}
+                      onLoad={(e) => { if(e.target.previousSibling) e.target.previousSibling.style.display = 'none'; }}
+                      style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none',zIndex:1 }}
+                      allow="autoplay; fullscreen" allowFullScreen/>
+                  )}
+                  {(info.type === 'local' || info.type === 'direct') && (
+                    <video src={info.id} controls autoPlay style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none',outline:'none',zIndex:1 }} />
+                  )}
                 </div>
-              )}
+                {/* Bottom bar */}
+                <div style={{ padding:'12px 18px',background:'var(--s2)',display:'flex',alignItems:'center',gap:10,borderTop:'1px solid var(--surface-b)',flexShrink:0 }}>
+                  <span style={{ fontSize:10,fontWeight:800,padding:'3px 10px',borderRadius:99,background:`${color}22`,color,textTransform:'uppercase',flexShrink:0 }}>{video.subject}</span>
+                  <p style={{ fontSize:13,fontWeight:700,color:'var(--t1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',minWidth:0,flex:1 }}>{video.title}</p>
+                </div>
+              </div>
 
-              {info.type === 'youtube' && (
-                <iframe src={`https://www.youtube.com/embed/${info.id}?autoplay=1`} title={video.title}
-                  onLoad={(e) => e.target.previousSibling.style.display = 'none'}
-                  style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none',zIndex:1 }}
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen/>
-              )}
+              {/* Right: Study Notes Sidebar */}
+              <div className="video-studio-sidebar" style={{ width:340,display:'flex',flexDirection:'column',borderLeft:'1px solid var(--surface-b)',background:'var(--s1)',flexShrink:0 }}>
+                {/* Sidebar Header */}
+                <div style={{ padding:'14px 20px',borderBottom:'1px solid var(--surface-b)',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(9,205,131,0.03)',flexShrink:0 }}>
+                  <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:18,color:'var(--p)',fontVariationSettings:"'FILL' 1" }}>edit_note</span>
+                    <span style={{ fontSize:13,fontWeight:800,color:'var(--t1)' }}>Study Notes</span>
+                  </div>
+                  <button onClick={()=>setShowPlayer(false)} className="icon-btn" style={{ width:28,height:28,background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:8 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>close</span>
+                  </button>
+                </div>
 
-              {info.type === 'drive' && (
-                <iframe src={info.embedUrl} title={video.title}
-                  onLoad={(e) => e.target.previousSibling.style.display = 'none'}
-                  style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none',zIndex:1 }}
-                  allow="autoplay; fullscreen" allowFullScreen/>
-              )}
+                {/* Note Content */}
+                <div style={{ flex:1,padding:'16px 20px',display:'flex',flexDirection:'column',gap:12,overflowY:'auto' }}>
+                  <p style={{ fontSize:11,fontWeight:700,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'0.08em' }}>Capture thoughts while watching</p>
+                  <textarea
+                    value={sideNote}
+                    onChange={e=>setSideNote(e.target.value)}
+                    placeholder={"Write your notes here as you watch…\n\n• Key concepts\n• Questions to explore\n• Important timestamps"}
+                    style={{ flex:1,minHeight:180,padding:'16px',background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:'var(--r-lg)',color:'var(--t2)',fontSize:13.5,resize:'none',outline:'none',lineHeight:1.7,fontFamily:"'Inter', sans-serif",transition:'border-color 0.2s' }}
+                    onFocus={e=>e.target.style.borderColor='var(--p)'}
+                    onBlur={e=>e.target.style.borderColor='var(--surface-b)'}
+                  />
+                  {video.notes && (
+                    <div style={{ padding:'12px',borderRadius:'var(--r-md)',background:'var(--s3)',borderLeft:'2px solid var(--p)' }}>
+                      <p style={{ fontSize:10,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:6 }}>Previous Note</p>
+                      <p style={{ fontSize:12,color:'var(--t2)',lineHeight:1.5 }}>{video.notes}</p>
+                    </div>
+                  )}
+                </div>
 
-              {(info.type === 'local' || info.type === 'direct') && (
-                <video src={info.id} controls autoPlay style={{ position:'absolute',inset:0,width:'100%',height:'100%',border:'none', outline:'none', zIndex:1 }} 
-                  onError={(e) => { e.target.outerHTML = '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;text-align:center;padding:20px;z-index:2;background:var(--s2)"><span class="material-symbols-outlined" style="font-size:48px;color:#ff6b6b;margin-bottom:12px">error</span><p style="font-weight:700;font-size:16px;color:var(--t1)">Video source unavailable or expired.</p><p style="font-size:13px;color:var(--t4);margin-top:8px;max-width:300px">If this was a local file from your gallery, you must re-add it. Object URLs expire after closing the app for security.</p></div>'; }} />
-              )}
-            </div>
-            <div style={{ padding:'14px 18px',background:'var(--s2)',display:'flex',alignItems:'center',justifyContent:'space-between', borderTop:'1px solid var(--surface-b)' }}>
-              <p style={{ fontSize:14,fontWeight:700,color:'var(--t1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,minWidth:0 }}>{video.title}</p>
-              <button onClick={()=>setShowPlayer(false)} className="btn btn-surface" style={{ padding:'7px 16px',fontSize:12,marginLeft:12,flexShrink:0 }}>Close</button>
+                {/* Sidebar Actions */}
+                <div style={{ padding:'14px 20px',borderTop:'1px solid var(--surface-b)',display:'flex',flexDirection:'column',gap:8,flexShrink:0,background:'var(--s2)' }}>
+                  <button
+                    onClick={()=>{ if(!sideNote.trim()){toast.error('Write some notes first');return;} onCreateNote(`Notes: ${video.title}`, sideNote, video.subject); setSideNote(''); }}
+                    disabled={!sideNote.trim()}
+                    style={{ width:'100%',padding:'10px 16px',borderRadius:'var(--r-md)',border:'none',cursor:sideNote.trim()?'pointer':'not-allowed',background:sideNote.trim()?'var(--p)':'var(--s3)',color:sideNote.trim()?'#002a18':'var(--t4)',fontWeight:800,fontSize:12,display:'flex',alignItems:'center',justifyContent:'center',gap:8,transition:'all 0.2s',boxShadow:sideNote.trim()?'0 4px 12px rgba(9,205,131,0.2)':'none' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize:16 }}>save</span>
+                    Save to Notes Collection
+                  </button>
+                  <div style={{ display:'flex',gap:6 }}>
+                    <button onClick={()=>onCreateTask(`Review: ${video.title}`, video.subject)}
+                      style={{ flex:1,padding:'8px',borderRadius:'var(--r-sm)',border:'1px solid rgba(96,165,250,0.15)',background:'rgba(96,165,250,0.04)',color:'#60a5fa',fontSize:11,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:4,transition:'all 0.2s' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:14 }}>add_task</span>Task
+                    </button>
+                    <button onClick={()=>onScheduleStudy(video.subject, video.title)}
+                      style={{ flex:1,padding:'8px',borderRadius:'var(--r-sm)',border:'1px solid rgba(251,146,60,0.15)',background:'rgba(251,146,60,0.04)',color:'#fb923c',fontSize:11,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:4,transition:'all 0.2s' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize:14 }}>event</span>Schedule
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   );
@@ -454,7 +526,7 @@ function PlaylistBuilderModal({ videos, playlists, onClose, onSave }) {
         <div style={{ padding:'20px 24px',borderBottom:'1px solid var(--surface-b)',display:'flex',alignItems:'center',justifyContent:'space-between' }}>
           <div style={{ display:'flex',alignItems:'center',gap:10 }}>
             <span className="material-symbols-outlined" style={{ fontSize:20,color:'var(--p)',fontVariationSettings:"'FILL' 1" }}>featured_play_list</span>
-            <span style={{ fontSize:16,fontWeight:800,color:'var(--t1)' }}>Create Playlist</span>
+            <span style={{ fontSize:15,fontWeight:800,color:'var(--t1)' }}>Create Playlist</span>
           </div>
           <button onClick={onClose} className="icon-btn"><span className="material-symbols-outlined" style={{ fontSize:20 }}>close</span></button>
         </div>
@@ -518,6 +590,13 @@ export default function Videos() {
   const [filter,  setFilter]  = useState('all');
   const [search,  setSearch]  = useState('');
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const playlists = useMemo(() => Array.from(new Set(videos.map(v => v.playlist).filter(Boolean))), [videos]);
 
   const filtered = useMemo(() => {
@@ -550,12 +629,12 @@ export default function Videos() {
         @keyframes scaleIn{from{opacity:0;transform:scale(0.93)}to{opacity:1;transform:scale(1)}}
       `}</style>
 
-      <div className="fadeup" style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,marginBottom:20,flexWrap:'wrap' }}>
+      <div className="fadeup" style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'var(--gap)',marginBottom:12,flexWrap:'wrap' }}>
         <div>
           <h1 className="shimmer-text page-title">Video Library</h1>
           <p style={{ fontSize:13,color:'var(--t3)',marginTop:4 }}>{watched} watched · {unwatched} to watch</p>
         </div>
-        <div style={{ display:'flex', gap:10 }}>
+        <div style={{ display:'flex', gap:'var(--gap-sm)' }}>
           <button onClick={()=>setShowPlaylistBuilder(true)} className="btn btn-surface" style={{ padding:'10px 18px', fontWeight:700, display:'flex', alignItems:'center', gap:8 }}>
             <span className="material-symbols-outlined" style={{ fontSize:18 }}>featured_play_list</span>Create Playlist
           </button>
@@ -565,23 +644,23 @@ export default function Videos() {
         </div>
       </div>
 
-      <div className="grid-3 fadeup" style={{ gap:12,marginBottom:20 }}>
+      <div className="fadeup" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: isMobile ? 6 : 'var(--gap-card)', marginBottom: 20 }}>
         {[
           { l:'Total Videos', v:videos.length, c:'var(--p)',  icon:'video_library' },
           { l:'Playlists',    v:playlists.length, c:'#a78bfa',  icon:'featured_play_list' },
           { l:'In Queue',     v:unwatched,     c:'#e9cd6e',  icon:'schedule'      },
         ].map(({ l,v,c,icon },i) => (
-          <div key={l} className={`card fadeup d${i+1}`} style={{ padding:'16px 14px',textAlign:'center' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:20,color:c,display:'block',marginBottom:6 }}>{icon}</span>
-            <p style={{ fontSize:22,fontWeight:800,color:c,letterSpacing:'-0.02em',lineHeight:1 }}><Counter value={v}/></p>
-            <p style={{ fontSize:11,color:'var(--t4)',marginTop:4, fontWeight:700 }}>{l}</p>
+          <div key={l} className={`card fadeup d${i+1}`} style={{ padding: isMobile ? '8px 4px 10px' : '16px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: isMobile ? 18 : 20, color: c, display: 'block', marginBottom: isMobile ? 4 : 6 }}>{icon}</span>
+            <p style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: c, letterSpacing: '-0.02em', lineHeight: 1 }}><Counter value={v}/></p>
+            <p style={{ fontSize: isMobile ? 9.5 : 11, color: 'var(--t4)', marginTop: isMobile ? 3 : 4, fontWeight: 700, whiteSpace: 'nowrap' }}>{l}</p>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="fadeup d3" style={{ display:'flex',flexDirection:'column',gap:12,marginBottom:24 }}>
-        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+      <div className="fadeup d3" style={{ display:'flex',flexDirection:'column',gap:'var(--gap-sm)',marginBottom:24 }}>
+        <div style={{ display:'flex', gap:'var(--gap-sm)', flexWrap:'wrap' }}>
           <div style={{ position:'relative', flex:1, minWidth:200 }}>
             <span className="material-symbols-outlined" style={{ position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:18,color:'var(--t4)',pointerEvents:'none' }}>search</span>
             <input className="input" style={{ paddingLeft:42, width:'100%' }} placeholder="Search titles or playlists…" value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -599,7 +678,7 @@ export default function Videos() {
         {/* Subjects & Playlists Row */}
         <div style={{ display:'flex',gap:16,overflowX:'auto',paddingBottom:4, alignItems:'center' }}>
           <div style={{ display:'flex',gap:6, alignItems:'center' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--t4)' }}>category</span>
+            <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--t4)' }}>category</span>
             {['All',...SUBJECTS.slice(0,5)].map(s=>{
               const c = SUBJECT_COLORS[s]||'var(--p)';
               return (
@@ -615,7 +694,7 @@ export default function Videos() {
             <>
               <div style={{ width:1, height:20, background:'var(--surface-b)', flexShrink:0 }}/>
               <div style={{ display:'flex',gap:6, alignItems:'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize:16, color:'#a78bfa' }}>featured_play_list</span>
+                <span className="material-symbols-outlined" style={{ fontSize:15, color:'#a78bfa' }}>featured_play_list</span>
                 <button onClick={()=>setActivePlaylist('All')}
                   style={{ padding:'5px 14px',borderRadius:99,border:`1px solid ${activePlaylist==='All'?'#a78bfa':'rgba(255,255,255,0.07)'}`,background:activePlaylist==='All'?'rgba(167,139,250,0.1)':'transparent',color:activePlaylist==='All'?'#a78bfa':'var(--t4)',cursor:'pointer',fontWeight:700,fontSize:11.5,whiteSpace:'nowrap',transition:'all 160ms ease',flexShrink:0 }}>
                   All Playlists
@@ -634,27 +713,30 @@ export default function Videos() {
 
       {/* Video grid */}
       {filtered.length > 0 ? (
-        <div className="tilt-container" style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:16 }}>
+        <div className="tilt-container" style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'var(--gap-card)' }}>
           {filtered.map((v,i) => (
             <div key={v.id} className="fadeup tilt-card" style={{ animationDelay:`${i*0.04}s`, display:'flex' }}>
               <VideoCard video={v}
                 onToggle={id=>{ A.video.update({...v,watched:!v.watched}); toast.success(v.watched?'Marked unwatched':'Marked watched ✅'); }}
                 onNote={(id,note)=>A.video.update({...v,notes:note})}
-                onDelete={id=>{ A.video.remove(id); toast.success('Removed'); }}/>
+                onDelete={id=>{ A.video.remove(id); toast.success('Removed'); }}
+                onCreateNote={(title, content, subject) => { A.note.add({ title, content, subject, tags:['video-note'] }); toast.success('Note saved to collection! 📝'); }}
+                onCreateTask={(title, subject) => { A.task.add({ title, subject, priority:'medium' }); toast.success('Task created! ✅'); }}
+                onScheduleStudy={(subject, topic) => { const d = new Date(); d.setDate(d.getDate()+1); A.schedule.add({ subject, topic:`Review: ${topic.substring(0,40)}`, startTime:'10:00', durationMinutes:60, day:d.toISOString().slice(0,10) }); toast.success('Study session scheduled! 📅'); }}/>
             </div>
           ))}
         </div>
       ) : (
         <div className="fadeup card" style={{ textAlign:'center',padding:'80px 20px', background:'var(--s1)', border:'1px dashed var(--surface-b)' }}>
           <div className="empty-illust" style={{ fontSize:64,marginBottom:20,display:'inline-block' }}>🎬</div>
-          <p style={{ fontSize:16,fontWeight:800,color:'var(--t1)' }}>{search||subject!=='All'||filter!=='all'||activePlaylist!=='All'?'No results found':'Library is empty'}</p>
+          <p style={{ fontSize:15,fontWeight:800,color:'var(--t1)' }}>{search||subject!=='All'||filter!=='all'||activePlaylist!=='All'?'No results found':'Library is empty'}</p>
           <p style={{ fontSize:13,color:'var(--t4)',marginTop:8, maxWidth:400, marginInline:'auto' }}>{search||subject!=='All'||filter!=='all'||activePlaylist!=='All'?'Try clearing your search or filters.':'Curate your knowledge by saving educational videos from YouTube, Google Drive, or your device.'}</p>
           {!search&&subject==='All'&&filter==='all'&&activePlaylist==='All'&&<button onClick={()=>setShowAdd(true)} className="btn btn-primary" style={{ padding:'12px 32px', marginTop:24 }}>Add First Video</button>}
         </div>
       )}
 
-      {showAdd && <AddModal onClose={()=>setShowAdd(false)} onSave={A.video.add} existingPlaylists={playlists}/>}
-      {showPlaylistBuilder && <PlaylistBuilderModal videos={videos} playlists={playlists} onClose={()=>setShowPlaylistBuilder(false)} onSave={handleCreatePlaylist} />}
+      {showAdd && <Portal><AddModal onClose={()=>setShowAdd(false)} onSave={A.video.add} existingPlaylists={playlists}/></Portal>}
+      {showPlaylistBuilder && <Portal><PlaylistBuilderModal videos={videos} playlists={playlists} onClose={()=>setShowPlaylistBuilder(false)} onSave={handleCreatePlaylist} /></Portal>}
     </div>
   );
 }

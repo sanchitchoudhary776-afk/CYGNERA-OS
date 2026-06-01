@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-//  CYGNERA OS · NOTES CLOUD SERVICE
+//  AXINITE OS · NOTES CLOUD SERVICE
 //  Architecture: Dedicated relational table — NOT the monolithic JSON blob.
 //  Each note is stored as its own row. Only the changed note is saved.
 //  Designed to comfortably support 1000+ students on the Supabase free tier.
@@ -21,22 +21,33 @@ const compressContent = (content) => {
     .trim();
 };
 
-// Strip heavy AI data that can be regenerated — saves ~60% payload vs full note
-const toCloudPayload = (note, userId) => ({
-  id: note.id,
-  user_id: userId,
-  title: (note.title || 'Untitled').slice(0, 255),
-  content: compressContent(note.content || ''),
-  subject: note.subject || 'General',
-  tags: Array.isArray(note.tags) ? note.tags.slice(0, 10) : [],
-  word_count: note.wordCount || (note.content || '').trim().split(/\s+/).filter(Boolean).length,
-  ai_summary: note.summary ? note.summary.slice(0, 500) : null,  // Short summary only
-  ai_concepts: note.concepts ? note.concepts.slice(0, 8) : null, // Max 8 concepts
-  // Flashcards are intentionally excluded — they can be regenerated
-  // and are the heaviest part of the note object
-  updated_at: new Date().toISOString(),
-  created_at: note.createdAt || new Date().toISOString(),
-});
+// Compress and archive notes older than 15 days in the cloud (full note remains on local storage)
+const toCloudPayload = (note, userId) => {
+  const updatedDate = note.updatedAt ? new Date(note.updatedAt) : new Date();
+  const fifteenDaysAgo = Date.now() - 15 * 24 * 60 * 60 * 1000;
+  const isRecent = updatedDate.getTime() > fifteenDaysAgo;
+
+  const rawContent = note.content || '';
+  // Recent notes (modified in last 15 days) get fully saved.
+  // Older notes get truncated to the first 1000 characters as a light outline to preserve cloud space.
+  const contentToSave = isRecent 
+    ? rawContent 
+    : (rawContent.length > 1000 ? rawContent.slice(0, 1000) + '\n\n[Full note content safely archived on local storage to save cloud space]' : rawContent);
+
+  return {
+    id: note.id,
+    user_id: userId,
+    title: (note.title || 'Untitled').slice(0, 255),
+    content: compressContent(contentToSave),
+    subject: note.subject || 'General',
+    tags: Array.isArray(note.tags) ? note.tags.slice(0, 10) : [],
+    word_count: note.wordCount || rawContent.trim().split(/\s+/).filter(Boolean).length,
+    ai_summary: note.summary ? note.summary.slice(0, 500) : null,
+    ai_concepts: note.concepts ? note.concepts.slice(0, 8) : null,
+    updated_at: note.updatedAt || new Date().toISOString(),
+    created_at: note.createdAt || new Date().toISOString(),
+  };
+};
 
 // Reconstruct local note from cloud row
 const fromCloudRow = (row) => ({
@@ -57,7 +68,7 @@ const fromCloudRow = (row) => ({
 
 // ─── Offline Queue ─────────────────────────────────────────────
 // If the user is offline, we queue operations and flush when back online.
-const QUEUE_KEY = 'cygnera_notes_queue';
+const QUEUE_KEY = 'axinite_notes_queue';
 
 const queue = {
   get: () => {
@@ -225,9 +236,16 @@ export const notesCloud = {
 // When the browser comes back online, automatically push any pending notes.
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
-    const userId = localStorage.getItem('cygnera_user_id');
-    if (userId) {
-      setTimeout(() => notesCloud.flushQueue(userId), 2000); // Small delay for connection to stabilize
+    try {
+      const rawUser = localStorage.getItem('los_auth_user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        if (u?.id) {
+          setTimeout(() => notesCloud.flushQueue(u.id), 2000); // Small delay for connection to stabilize
+        }
+      }
+    } catch (e) {
+      console.error('[NotesCloud] Failed to parse auth user for online flush queue:', e);
     }
   });
 }

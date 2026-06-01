@@ -1,10 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="22" fill="#0d1117" />
   <defs>
     <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#09cd83"/>
-      <stop offset="100%" stop-color="#3df5a0"/>
+      <stop offset="0%" stop-color="#b2dfdb" />
+      <stop offset="100%" stop-color="#0a1a19" />
     </linearGradient>
+    <filter id="f">
+      <feGaussianBlur stdDeviation="1" result="b"/>
+      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    </filter>
   </defs>
-  <rect width="32" height="32" rx="8" fill="url(#g)"/>
-  <text x="16" y="22" font-size="18" text-anchor="middle" font-family="sans-serif" font-weight="bold" fill="#002a18">L</text>
+  {/* Shield Frame */}
+  <path d="M50 8 L92 32 L92 72 L50 96 L8 72 L8 32 Z" stroke="url(#g)" stroke-width="5" fill="none" />
+  {/* Layered A */}
+  <path d="M50 12 L86 85 L69 85 L50 48 L31 85 L14 85 Z" fill="url(#g)" />
+  <path d="M50 12 L69 85 L50 48 Z" fill="rgba(255,255,255,0.2)" />
+  <path d="M50 12 L50 48 L31 85 Z" fill="rgba(0,0,0,0.4)" />
+  {/* Crossbar */}
+  <path d="M33 58 L67 58 L62 67 L38 67 Z" fill="#3df5a0" filter="url(#f)" />
 </svg>

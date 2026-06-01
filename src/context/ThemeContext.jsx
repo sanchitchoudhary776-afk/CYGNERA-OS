@@ -6,7 +6,7 @@ const ThemeContext = createContext({
   setTheme: () => {}
 });
 
-const STORAGE_KEY = 'cygnera-os-theme';
+const STORAGE_KEY = 'axinite-os-theme';
 
 export function ThemeProvider({ children }) {
   const [theme, setThemeState] = useState('dark');

@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp }         from '@context/AppContext';
 import { generateSchedule } from '@services/ai';
 import { AI }             from '@services/ai';
 import { SUBJECT_COLORS, SUBJECTS, fmt } from '@utils';
 import toast from 'react-hot-toast';
 import { usePremium, Counter } from '@components/ui/PremiumUI';
+import { Portal } from '@components/ui';
 
 const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -22,6 +23,13 @@ function getWeekDates() {
 
 // ── Add Session Modal ─────────────────────────
 function AddModal({ onClose, onSave, defaultDay }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const today = new Date().toISOString().slice(0,10);
   const [form, setForm] = useState({
     subject:'Web Dev', topic:'', startTime:'09:00',
@@ -37,17 +45,17 @@ function AddModal({ onClose, onSave, defaultDay }) {
   };
 
   return (
-    <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:100,display:'flex',alignItems:'center',justifyContent:'center',background:'var(--overlay)',animation:'modalFadeIn 300ms ease both', padding:20 }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'100%',maxWidth:500,display:'flex',flexDirection:'column',background:'var(--s2)',border:'1px solid var(--card-b-h)',borderRadius:'var(--r-xl)',boxShadow:'0 24px 80px rgba(0,0,0,0.4)',animation:'modalCenterIn 400ms var(--bounce) both' }}>
-        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px',borderBottom:'1px solid var(--surface-b)',flexShrink:0 }}>
+    <div onClick={onClose} className="modal-backdrop">
+      <div onClick={e=>e.stopPropagation()} className="modal" style={{ maxWidth:500 }}>
+        <div className="modal-header">
           <div style={{ display:'flex',alignItems:'center',gap:10 }}>
             <span className="material-symbols-outlined" style={{ fontSize:18,color:'var(--p)' }}>calendar_add_on</span>
             <span style={{ fontSize:14,fontWeight:700,color:'var(--t1)' }}>Add Study Session</span>
           </div>
           <button onClick={onClose} className="icon-btn"><span className="material-symbols-outlined" style={{ fontSize:20 }}>close</span></button>
         </div>
-        <div style={{ padding:'18px 20px',display:'flex',flexDirection:'column',gap:14,overflowY:'auto' }}>
-          <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
+        <div style={{ padding: isMobile ? '12px 14px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 14, overflowY: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 10 : 12 }}>
             <div>
               <label className="label">Subject</label>
               <select className="input" value={form.subject} onChange={set('subject')}>
@@ -63,7 +71,7 @@ function AddModal({ onClose, onSave, defaultDay }) {
             <label className="label">Topic</label>
             <input className="input" placeholder="e.g. React Hooks, Calculus derivatives…" value={form.topic} onChange={set('topic')}/>
           </div>
-          <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 10 : 12 }}>
             <div>
               <label className="label">Start Time</label>
               <select className="input" value={form.startTime} onChange={set('startTime')}>
@@ -72,10 +80,10 @@ function AddModal({ onClose, onSave, defaultDay }) {
             </div>
             <div>
               <label className="label">Duration</label>
-              <div style={{ display:'flex',gap:5,flexWrap:'wrap' }}>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                 {DURATIONS.map(d=>(
                   <button key={d} onClick={()=>setForm(p=>({...p,durationMinutes:d}))}
-                    style={{ flex:1,padding:'10px 4px',borderRadius:'var(--r-md)',border:`1px solid ${form.durationMinutes===d?'var(--p)':'var(--surface-b)'}`,background:form.durationMinutes===d?'rgba(9,205,131,0.10)':'transparent',color:form.durationMinutes===d?'var(--p)':'var(--t4)',cursor:'pointer',fontSize:11,fontWeight:700,transition:'all 150ms ease' }}>
+                    style={{ flex: 1, padding: isMobile ? '7px 4px' : '10px 4px', borderRadius: 'var(--r-md)', border: `1px solid ${form.durationMinutes===d?'var(--p)':'var(--surface-b)'}`, background: form.durationMinutes===d?'rgba(9,205,131,0.10)':'transparent', color: form.durationMinutes===d?'var(--p)':'var(--t4)', cursor: 'pointer', fontSize: isMobile ? 10 : 11, fontWeight: 700, transition: 'all 150ms ease' }}>
                     {d<60?`${d}m`:`${d/60}h`}
                   </button>
                 ))}
@@ -83,10 +91,10 @@ function AddModal({ onClose, onSave, defaultDay }) {
             </div>
           </div>
         </div>
-        <div style={{ display:'flex',gap:10,padding:'14px 20px',borderTop:'1px solid var(--surface-b)' }}>
-          <button onClick={onClose} className="btn btn-surface" style={{ padding:'11px 20px' }}>Cancel</button>
-          <button onClick={submit} className="btn btn-primary" style={{ flex:1,padding:'11px' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:17 }}>add</span>Add Session
+        <div className="modal-footer" style={{ padding: isMobile ? '10px 14px' : '12px 20px' }}>
+          <button onClick={onClose} className="btn btn-surface" style={{ padding: isMobile ? '8px 16px' : '11px 20px' }}>Cancel</button>
+          <button onClick={submit} className="btn btn-primary" style={{ flex: 1, padding: isMobile ? '8px' : '11px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 17 }}>add</span>Add Session
           </button>
         </div>
       </div>
@@ -121,6 +129,14 @@ export default function Schedule() {
   const [aiLoad,   setAiLoad]   = useState(false);
   const weekDates = getWeekDates();
   const today     = new Date().toISOString().slice(0,10);
+  const [activeMobileDay, setActiveMobileDay] = useState(today);
+
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const sessionsForDay = day => schedule.filter(s=>s.day===day).sort((a,b)=>a.startTime.localeCompare(b.startTime));
 
@@ -131,6 +147,7 @@ export default function Schedule() {
   }, [schedule, weekDates]);
 
   const todaySessions = sessionsForDay(today);
+  const activeMobileSessions = sessionsForDay(activeMobileDay);
 
   const handleAI = async () => {
     if (!AI.enabled()) { toast('Add API key for AI ✦',{icon:'🔑'}); return; }
@@ -164,70 +181,181 @@ export default function Schedule() {
         @keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}} 
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
         @keyframes modalCenterIn{from{opacity:0;transform:scale(0.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+        
+        .mobile-calendar-nav {
+          display: none;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 4px 0 12px;
+          margin-bottom: 16px;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        .mobile-calendar-nav::-webkit-scrollbar {
+          display: none;
+        }
+        .mobile-calendar-nav-item {
+          flex: 0 0 calc((100% - 48px) / 7);
+          min-width: 44px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 10px 4px;
+          border-radius: 16px;
+          background: var(--s2);
+          border: 1px solid var(--surface-b);
+          cursor: pointer;
+          transition: all 0.2s var(--bounce);
+        }
+        .mobile-calendar-nav-item.active {
+          background: var(--p-sub);
+          border-color: var(--p);
+          transform: scale(1.05);
+          box-shadow: 0 4px 15px rgba(9, 205, 131, 0.15);
+        }
+        .mobile-timeline {
+          display: none;
+          flex-direction: column;
+          gap: 12px;
+        }
+        
+        @media (max-width: 768px) {
+          .stats-grid-responsive {
+            grid-template-columns: repeat(3, 1fr) !important;
+            gap: 6px !important;
+          }
+          .mobile-calendar-nav {
+            display: flex;
+          }
+          .mobile-timeline {
+            display: flex;
+          }
+          .desktop-only-calendar {
+            display: none !important;
+          }
+        }
       `}</style>
 
-      <div className="fadeup" style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,marginBottom:20,flexWrap:'wrap' }}>
+      <div className="fadeup" style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'var(--gap)',marginBottom:12,flexWrap:'wrap' }}>
         <div>
           <h1 className="shimmer-text page-title">Schedule</h1>
-          <p style={{ fontSize:13,color:'var(--t3)',marginTop:4 }}>{fmt.mins(totalMins)} planned this week</p>
+          <p style={{ fontSize:13,color:'var(--t3)',marginTop:4 }}>{totalMins > 0 ? `${fmt.mins(totalMins)} planned this week` : 'No sessions planned this week'}</p>
         </div>
-        <div style={{ display:'flex',gap:10 }}>
+        <div style={{ display:'flex',gap:16 }}>
           {AI.enabled() && (
             <button onClick={handleAI} disabled={aiLoad}
               style={{ display:'flex',alignItems:'center',gap:7,padding:'10px 16px',borderRadius:999,border:'1px solid rgba(9,205,131,0.25)',background:'rgba(9,205,131,0.08)',color:'var(--p)',fontWeight:700,fontSize:13,cursor:aiLoad?'not-allowed':'pointer',opacity:aiLoad?0.7:1 }}>
-              {aiLoad?<div className="spinner" style={{ width:14,height:14,borderWidth:2 }}/>:<span className="material-symbols-outlined" style={{ fontSize:16,fontVariationSettings:"'FILL' 1" }}>auto_awesome</span>}
+              {aiLoad?<div className="spinner" style={{ width:14,height:14,borderWidth:2 }}/>:<span className="material-symbols-outlined" style={{ fontSize:15,fontVariationSettings:"'FILL' 1" }}>auto_awesome</span>}
               AI Schedule
             </button>
           )}
-          <button onClick={()=>setShowAdd(true)} className="btn btn-primary">
+          <button onClick={()=>{ setSelDay(activeMobileDay); setShowAdd(true); }} className="btn btn-primary">
             <span className="material-symbols-outlined" style={{ fontSize:18 }}>add</span>Add Session
           </button>
         </div>
       </div>
 
       {/* Stats */}
-      <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:20 }}>
+      <div className="stats-grid-responsive" style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:isMobile ? 6 : 8,marginBottom:20 }}>
         {[
           { l:'Weekly (h)',   v:Math.round(totalMins/60), c:'var(--p)',   icon:'schedule'        },
           { l:'Sessions',    v:schedule.filter(s=>{ const w=weekDates[0].toISOString().slice(0,10); return s.day>=w; }).length, c:'#60a5fa', icon:'event' },
           { l:'Today',       v:todaySessions.length, c:'#e9cd6e',  icon:'today'           },
         ].map(({ l,v,c,icon },i) => (
-          <div key={l} className={`card fadeup d${i+1}`} style={{ padding:'16px 14px',textAlign:'center' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:20,color:c,display:'block',marginBottom:7 }}>{icon}</span>
-            <p style={{ fontSize:22,fontWeight:800,color:c,letterSpacing:'-0.02em',lineHeight:1 }}><Counter value={v}/></p>
-            <p style={{ fontSize:11,color:'var(--t4)',marginTop:4 }}>{l}</p>
+          <div key={l} className={`card fadeup d${i+1}`} style={{ padding: isMobile ? '8px 4px 10px' : '16px 14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: isMobile ? 18 : 20, color: c, display: 'block', marginBottom: isMobile ? 4 : 7 }}>{icon}</span>
+            <p style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: c, letterSpacing: '-0.02em', lineHeight: 1 }}><Counter value={v}/></p>
+            <p style={{ fontSize: isMobile ? 9.5 : 11, color: 'var(--t4)', marginTop: isMobile ? 3 : 4, fontWeight: 700, whiteSpace: 'nowrap' }}>{l}</p>
           </div>
         ))}
       </div>
 
-      {/* Today sessions */}
-      <div className="card fadeup d3" style={{ padding:18,marginBottom:20,background:'linear-gradient(135deg,rgba(9,205,131,0.06),rgba(9,205,131,0.02))' }}>
-        <p className="section-label" style={{ marginBottom:12 }}>Today's Sessions</p>
-        {todaySessions.length > 0 ? (
-          <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
-            {todaySessions.map(s => {
-              const c = SUBJECT_COLORS[s.subject]||'var(--p)';
-              return (
-                <div key={s.id} style={{ display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:'var(--r-md)',background:'var(--s3)',borderLeft:`3px solid ${c}` }}>
-                  <span style={{ fontSize:13,fontWeight:800,color:'var(--t1)',minWidth:42,fontVariantNumeric:'tabular-nums' }}>{s.startTime}</span>
-                  <div style={{ flex:1,minWidth:0 }}>
-                    <p style={{ fontSize:13,fontWeight:700,color:'var(--t1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{s.topic}</p>
-                    <p style={{ fontSize:11,color:c }}>{s.subject} · {s.durationMinutes}m</p>
-                  </div>
-                  <button onClick={async ()=>{ if(await askConfirm('Remove session?', `Delete "${s.topic}"?`)) { A.schedule.remove(s.id); toast.success('Removed'); } }} className="icon-btn" style={{ width:28,height:28,opacity:0.45 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize:15 }}>delete</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p style={{ fontSize:13, color:'var(--t4)', textAlign:'center', padding:'10px' }}>No sessions scheduled for today</p>
-        )}
+      {/* Mobile-Native Day Picker Navigation */}
+      <div className="mobile-calendar-nav fadeup d3">
+        {weekDates.map((d, i) => {
+          const dayKey = d.toISOString().slice(0, 10);
+          const isActive = dayKey === activeMobileDay;
+          const isT = dayKey === today;
+          const count = sessionsForDay(dayKey).length;
+
+          return (
+            <div
+              key={i}
+              className={`mobile-calendar-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setActiveMobileDay(dayKey)}
+            >
+              <span style={{ fontSize: 9, fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--p)' : 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {DAYS_SHORT[i]}
+              </span>
+              <div style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: isT ? 'var(--p)' : 'transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '4px 0',
+                boxShadow: isT ? '0 0 8px rgba(9,205,131,0.4)' : 'none'
+              }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: isT ? 'var(--bg-deep)' : (isActive ? 'var(--p)' : 'var(--t2)') }}>
+                  {d.getDate()}
+                </span>
+              </div>
+              {count > 0 && (
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: isActive ? 'var(--p)' : 'var(--t4)', marginTop: 2 }} />
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Week Calendar */}
-      <div className="card fadeup d4" style={{ padding:0,overflow:'hidden' }}>
+      {/* Mobile Timeline View */}
+      <div className="mobile-timeline fadeup d4">
+        <div className="card" style={{ padding: 18, background: 'var(--s2)', border: '1px solid var(--surface-b)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p className="section-label" style={{ margin: 0 }}>
+              {activeMobileDay === today ? "Today's Timeline" : `${DAYS_FULL[new Date(activeMobileDay).getDay() === 0 ? 6 : new Date(activeMobileDay).getDay() - 1]}'s Timeline`}
+            </p>
+            <span style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 700 }}>{activeMobileSessions.length} sessions</span>
+          </div>
+
+          {activeMobileSessions.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {activeMobileSessions.map(s => {
+                const c = SUBJECT_COLORS[s.subject] || 'var(--p)';
+                return (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 'var(--r-md)', background: 'var(--s3)', borderLeft: `3px solid ${c}` }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', minWidth: 42, fontVariantNumeric: 'tabular-nums' }}>{s.startTime}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{s.topic}</p>
+                      <p style={{ fontSize: 11, color: c, margin: '2px 0 0' }}>{s.subject} · {s.durationMinutes}m</p>
+                    </div>
+                    <button onClick={async () => { if (await askConfirm('Remove session?', `Delete "${s.topic}"?`)) { A.schedule.remove(s.id); toast.success('Removed'); } }} className="icon-btn" style={{ width: 28, height: 28, opacity: 0.45 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--t4)', opacity: 0.5, marginBottom: 8 }}>event_note</span>
+              <p style={{ fontSize: 12, color: 'var(--t4)', margin: 0 }}>No sessions scheduled for this day</p>
+              <button
+                onClick={() => { setSelDay(activeMobileDay); setShowAdd(true); }}
+                style={{ background: 'none', border: 'none', color: 'var(--p)', fontSize: 12, fontWeight: 800, marginTop: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
+                Schedule one now
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Week Calendar - Desktop Only */}
+      <div className="card fadeup d4 desktop-only-calendar" style={{ padding:0,overflow:'hidden' }}>
         {/* Day headers */}
         <div style={{ display:'grid',gridTemplateColumns:'48px repeat(7,1fr)',borderBottom:'1px solid var(--surface-b)' }}>
           <div style={{ padding:'12px 6px' }}/>
@@ -275,7 +403,7 @@ export default function Schedule() {
         </div>
       </div>
 
-      {showAdd && <AddModal onClose={()=>{ setShowAdd(false); setSelDay(null); }} onSave={A.schedule.add} defaultDay={selDay}/>}
+      {showAdd && <Portal><AddModal onClose={()=>{ setShowAdd(false); setSelDay(null); }} onSave={A.schedule.add} defaultDay={selDay}/></Portal>}
     </div>
   );
 }

@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp }   from '@context/AppContext';
+import { useNetwork } from '@context/NetworkContext';
 import { breakTask } from '@services/ai';
 import { AI }       from '@services/ai';
 import { SUBJECT_COLORS, SUBJECTS, PRIORITY, daysUntil } from '@utils';
 import toast from 'react-hot-toast';
 import { usePremium } from '@components/ui/PremiumUI';
+import { Portal } from '@components/ui';
 
 const PC = {
   high:   { c:'#ff4e4e', bg:'rgba(255,78,78,0.06)', border:'rgba(255,78,78,0.2)', label:'Urgent' },
@@ -62,7 +64,7 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
             display:'flex', alignItems:'center', justifyContent:'center',
             transition:'all 300ms var(--bounce)'
           }}>
-          {done && <span className="material-symbols-outlined" style={{ fontSize:16, color:'#fff', fontVariationSettings:"'FILL' 1" }}>check</span>}
+          {done && <span className="material-symbols-outlined" style={{ fontSize:15, color:'#fff', fontVariationSettings:"'FILL' 1" }}>check</span>}
         </button>
 
         <div style={{ flex:1, minWidth:0 }}>
@@ -77,7 +79,7 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
             <div style={{ display:'flex', gap:6, flexShrink:0 }}>
               {done ? (
                 <button onClick={() => onRestore(task.id)} className="icon-btn" style={{ width:28, height:28, background:'rgba(9,205,131,0.1)' }} title="Restore to Active">
-                  <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--p)' }}>settings_backup_restore</span>
+                  <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--p)' }}>settings_backup_restore</span>
                 </button>
               ) : (
                 <>
@@ -137,12 +139,24 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
 }
 
 function TaskForm({ task, onSave, onClose }) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const { isOnline } = useNetwork();
   const [form, setForm] = useState({ title:task?.title||'', description:task?.description||'', subject:task?.subject||'Web Dev', priority:task?.priority||'medium', deadline:task?.deadline?task.deadline.slice(0,10):'', estimatedMinutes:task?.estimatedMinutes||60 });
   const [subtasks, setSubtasks] = useState(task?.subtasks||[]);
   const [aiLoad, setAiLoad] = useState(false);
   const set = k => e => setForm(p=>({...p,[k]:e.target?.value??e}));
 
   const runAI = async () => {
+    if (!isOnline) {
+      toast.error('Connect to the internet to run AI task breakdown 📡');
+      return;
+    }
     if (!form.title.trim()) { toast.error('Add a title first'); return; }
     if (!AI.enabled()) { toast('Add API key for AI ✦',{icon:'🔑'}); return; }
     setAiLoad(true);
@@ -163,45 +177,45 @@ function TaskForm({ task, onSave, onClose }) {
   };
 
   return (
-    <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:100,background:'var(--overlay)',display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'modalFadeIn 220ms ease both' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'100%',maxWidth:520,maxHeight:'92dvh',display:'flex',flexDirection:'column',background:'var(--s2)',border:'1px solid var(--card-b-h)',borderRadius:'var(--r-xl) var(--r-xl) 0 0',boxShadow:'var(--modal-sh)',animation:'modalSlideUp 340ms var(--bounce) both' }}>
-        <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 20px',borderBottom:'1px solid rgba(9,205,131,0.07)',flexShrink:0 }}>
+    <div onClick={onClose} className="modal-backdrop">
+      <div onClick={e=>e.stopPropagation()} className="modal">
+        <div className="modal-header">
           <span style={{ fontSize:14,fontWeight:700,color:'var(--t1)' }}>{task?.id?'Edit Task':'New Task'}</span>
           <button onClick={onClose} className="icon-btn"><span className="material-symbols-outlined" style={{ fontSize:20 }}>close</span></button>
         </div>
-        <div style={{ flex:1,overflowY:'auto',padding:'16px 20px',display:'flex',flexDirection:'column',gap:13 }}>
-          <div><label className="label">Title</label><input className="input" value={form.title} onChange={set('title')} placeholder="What needs to be done?" style={{ fontWeight:700 }}/></div>
-          <div><label className="label">Description</label><textarea className="input" rows={2} value={form.description} onChange={set('description')} placeholder="Details…" style={{ resize:'none' }}/></div>
-          <div style={{ display:'flex', flexDirection: 'column', gap:10 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '12px 14px' : '16px 20px', display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 13 }}>
+          <div><label className="label">Title</label><input className="input" value={form.title} onChange={set('title')} placeholder="What needs to be done?" style={{ fontWeight: 700 }}/></div>
+          <div><label className="label">Description</label><textarea className="input" rows={2} value={form.description} onChange={set('description')} placeholder="Details…" style={{ resize: 'none' }}/></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div><label className="label">Subject</label><select className="input" value={form.subject} onChange={set('subject')}>{SUBJECTS.map(s=><option key={s}>{s}</option>)}</select></div>
             <div>
               <label className="label">Priority</label>
-              <div style={{ display:'flex',gap:5 }}>
+              <div style={{ display: 'flex', gap: 5 }}>
                 {['high','medium','low'].map(pr=>(
-                  <button key={pr} onClick={()=>setForm(p=>({...p,priority:pr}))} style={{ flex:1,padding:'10px 2px',borderRadius:'var(--r-md)',border:`1px solid ${form.priority===pr?PC[pr].c+'55':'var(--surface-b)'}`,background:form.priority===pr?PC[pr].bg:'transparent',color:form.priority===pr?PC[pr].c:'var(--t4)',cursor:'pointer',fontWeight:700,fontSize:10.5,transition:'all 150ms ease' }}>{PC[pr].label}</button>
+                  <button key={pr} onClick={()=>setForm(p=>({...p,priority:pr}))} style={{ flex: 1, padding: isMobile ? '8px 2px' : '10px 2px', borderRadius: 'var(--r-md)', border: `1px solid ${form.priority===pr?PC[pr].c+'55':'var(--surface-b)'}`, background: form.priority===pr?PC[pr].bg:'transparent', color: form.priority===pr?PC[pr].c:'var(--t4)', cursor: 'pointer', fontWeight: 700, fontSize: isMobile ? 9.5 : 10.5, transition: 'all 150ms ease' }}>{PC[pr].label}</button>
                 ))}
               </div>
             </div>
           </div>
-          <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 10 : 10 }}>
             <div><label className="label">Deadline</label><input type="date" className="input" value={form.deadline} onChange={set('deadline')} /></div>
             <div><label className="label">Est. Minutes</label><input type="number" className="input" value={form.estimatedMinutes} onChange={set('estimatedMinutes')} min={5} max={480} step={5}/></div>
           </div>
           <div>
-            <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,flexWrap:'wrap',gap:8 }}>
-              <label className="label" style={{ margin:0,flexShrink:0 }}>Subtasks</label>
-              <button onClick={runAI} disabled={aiLoad} style={{ display:'flex',alignItems:'center',gap:5,padding:'5px 11px',borderRadius:999,border:'1px solid rgba(9,205,131,0.2)',background:'rgba(9,205,131,0.07)',color:'var(--p)',fontWeight:700,fontSize:11,cursor:'pointer',opacity:aiLoad?0.6:1,flexShrink:0,whiteSpace:'nowrap' }}>
-                {aiLoad?<div className="spinner" style={{ width:11,height:11,borderWidth:2 }}/>:<span className="material-symbols-outlined" style={{ fontSize:12,fontVariationSettings:"'FILL' 1" }}>auto_awesome</span>}
+            <div className="fadeup" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <label className="label" style={{ margin: 0, flexShrink: 0 }}>Subtasks</label>
+              <button onClick={runAI} disabled={aiLoad} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, border: '1px solid rgba(9,205,131,0.2)', background: 'rgba(9,205,131,0.07)', color: 'var(--p)', fontWeight: 700, fontSize: 11, cursor: 'pointer', opacity: aiLoad?0.6:1, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                {aiLoad?<div className="spinner" style={{ width: 11, height: 11, borderWidth: 2 }}/>:<span className="material-symbols-outlined" style={{ fontSize: 12, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>}
                 Construct Breakdown
               </button>
             </div>
-            {subtasks.length>0 ? <div style={{ display:'flex',flexDirection:'column',gap:5 }}>{subtasks.map((st,i)=><div key={i} style={{ display:'flex',alignItems:'center',gap:8,padding:'7px 11px',borderRadius:'var(--r-md)',background:'var(--s3)',border:'1px solid rgba(9,205,131,0.07)' }}><span className="material-symbols-outlined" style={{ fontSize:13,color:'var(--p)' }}>radio_button_unchecked</span><span style={{ fontSize:12,color:'var(--t2)',flex:1 }}>{st.title}</span><span style={{ fontSize:11,color:'var(--t4)' }}>{st.estimatedMinutes}m</span></div>)}</div>
-            : <p style={{ fontSize:12,color:'var(--t4)',textAlign:'center',padding:'10px' }}>Generate a tactical breakdown of this task</p>}
+            {subtasks.length>0 ? <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>{subtasks.map((st,i)=><div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 11px', borderRadius: 'var(--r-md)', background: 'var(--s3)', border: '1px solid rgba(9,205,131,0.07)' }}><span className="material-symbols-outlined" style={{ fontSize: 13, color: 'var(--p)' }}>radio_button_unchecked</span><span style={{ fontSize: 12, color: 'var(--t2)', flex: 1 }}>{st.title}</span><span style={{ fontSize: 11, color: 'var(--t4)' }}>{st.estimatedMinutes}m</span></div>)}</div>
+            : <p style={{ fontSize: 12, color: 'var(--t4)', textAlign: 'center', padding: '10px' }}>Generate a tactical breakdown of this task</p>}
           </div>
         </div>
-        <div style={{ display:'flex',gap:10,justifyContent:'flex-end',padding:'12px 20px',borderTop:'1px solid rgba(9,205,131,0.07)',flexShrink:0,paddingBottom:'max(12px,env(safe-area-inset-bottom))' }}>
-          <button onClick={onClose} className="btn btn-surface" style={{ padding:'9px 18px' }}>Cancel</button>
-          <button onClick={()=>{ if(!form.title.trim()){toast.error('Add a title');return;} onSave({...task,...form,subtasks,estimatedMinutes:Number(form.estimatedMinutes)}); }} className="btn btn-primary" style={{ padding:'9px 22px' }}>Save Task</button>
+        <div className="modal-footer" style={{ padding: isMobile ? '10px 14px' : '12px 20px' }}>
+          <button onClick={onClose} className="btn btn-surface" style={{ padding: isMobile ? '8px 16px' : '9px 18px' }}>Cancel</button>
+          <button onClick={()=>{ if(!form.title.trim()){toast.error('Add a title');return;} onSave({...task,...form,subtasks,estimatedMinutes:Number(form.estimatedMinutes)}); }} className="btn btn-primary" style={{ padding: isMobile ? '8px 16px' : '9px 22px', flex: isMobile ? 1 : 'none' }}>Save Task</button>
         </div>
       </div>
     </div>
@@ -221,12 +235,12 @@ export default function Tasks() {
 
   return (
     <div className="page">
-      <div className="fadeup" style={{ display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,marginBottom:32,flexWrap:'wrap' }}>
+      <div className="fadeup" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'var(--gap)' }}>
         <div>
-          <h1 className="shimmer-text page-title">Study Pipeline</h1>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:6 }}>
+          <h1 className="shimmer-text page-title">Pipeline</h1>
+          <div style={{ display:'flex', alignItems:'center', gap:'var(--gap-sm)', marginTop:4 }}>
             <div style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:8, background:'var(--s3)', border:'1px solid var(--surface-b)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--p)' }}>pending_actions</span>
+              <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--p)' }}>rocket_launch</span>
               <span style={{ fontSize:11, fontWeight:800, color:'var(--t2)' }}>{pending.length} Active</span>
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', borderRadius:8, background:'var(--s3)', border:'1px solid var(--surface-b)' }}>
@@ -241,12 +255,12 @@ export default function Tasks() {
         </button>
       </div>
 
-      {(high>0||due>0) && <div className="fadeup d1" style={{ display:'flex',gap:10,marginBottom:24,flexWrap:'wrap' }}>
+      {(high>0||due>0) && <div className="fadeup d1" style={{ display:'flex',gap:10,flexWrap:'wrap' }}>
         {high>0&&<div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 16px',borderRadius:12,background:'rgba(255,78,78,0.08)',border:'1px solid rgba(255,78,78,0.2)', boxShadow:'0 4px 12px rgba(255,78,78,0.1)' }}><span className="material-symbols-outlined" style={{ fontSize:18,color:'#ff4e4e' }}>priority_high</span><span style={{ fontSize:12,fontWeight:900,color:'#ff4e4e',textTransform:'uppercase',letterSpacing:'0.02em' }}>{high} Urgent Tasks</span></div>}
         {due>0&&<div style={{ display:'flex',alignItems:'center',gap:8,padding:'10px 16px',borderRadius:12,background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)', boxShadow:'0 4px 12px rgba(251,191,36,0.1)' }}><span className="material-symbols-outlined" style={{ fontSize:18,color:'#fbbf24' }}>alarm_on</span><span style={{ fontSize:12,fontWeight:900,color:'#fbbf24',textTransform:'uppercase',letterSpacing:'0.02em' }}>{due} Due Immediately</span></div>}
       </div>}
 
-      <div className="fadeup d2" style={{ display:'flex',gap:6,padding:'6px',background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:16,marginBottom:24,width:'fit-content',maxWidth:'100%',overflowX:'auto' }}>
+      <div className="card fadeup d3" style={{ display:'flex',gap:'var(--gap-xs)',padding:'6px',background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:16,width:'fit-content',maxWidth:'100%',overflowX:'auto' }}>
         {[{id:'pending',label:`Active Pipeline`, icon:'rocket_launch'},{id:'completed',label:`History`, icon:'history'}].map(f=>(
           <button key={f.id} onClick={()=>setFilter(f.id)} 
             style={{ 
@@ -264,7 +278,7 @@ export default function Tasks() {
       </div>
 
       {shown.length > 0 ? (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(360px, 1fr))', gap:16, paddingBottom:40 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap:'var(--gap-card)', paddingBottom:40 }}>
           {shown.map((t,i) => (
             <TaskCard key={t.id} index={i} task={t} 
               onComplete={id=>A.task.update({id,status:'completed'})} 
@@ -283,7 +297,7 @@ export default function Tasks() {
           <p style={{ fontSize:14,color:'var(--t4)',marginTop:8,maxWidth:280,marginInline:'auto',lineHeight:1.6 }}>{filter==='pending'?'Your academic engine is running at 100% efficiency. Time to refuel?':'Start completing tasks to build your historical study data.'}</p>
         </div>
       )}
-      {showForm&&<TaskForm task={editing} onSave={task=>{if(task.id){A.task.update(task);toast.success('Task Modified');}else{A.task.add(task);toast.success('Logic Stream Injected ✦');}setShowForm(false);setEditing(null);}} onClose={()=>{setShowForm(false);setEditing(null);}}/>}
+      {showForm&&<Portal><TaskForm task={editing} onSave={task=>{if(task.id){A.task.update(task);toast.success('Task Modified');}else{A.task.add(task);toast.success('Logic Stream Injected ✦');}setShowForm(false);setEditing(null);}} onClose={()=>{setShowForm(false);setEditing(null);}}/></Portal>}
     </div>
   );
 }

@@ -9,88 +9,185 @@ import { useAuth } from './AuthContext';
 const Ctx = createContext(null);
 const TimerCtx = createContext(null);
 
-// ── Demo Data ────────────────────────────────
-const NOW = Date.now();
-const D = (days) => new Date(NOW + days*86400000).toISOString();
+// ── SoundScape Synthesizer Alarm Generator ────────────────────────────
+// Creates a repeating, pleasant chime using Web Audio API
+let currentAlarmSource = null;
+let currentAlarmCtx = null;
+let alarmLoopTimer = null;
 
-const NOTES0 = [
-  { id:'note_1',title:'Photosynthesis — Complete',content:'Photosynthesis converts light energy into chemical energy. Light reactions occur in thylakoids producing ATP and NADPH. Dark reactions (Calvin Cycle) occur in stroma. Chlorophyll absorbs red and blue light. Overall equation: 6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂. Two stages: light-dependent and light-independent reactions. Chloroplasts are the organelles responsible. Factors affecting rate: light intensity, CO₂ concentration, temperature.',
-    subject:'Biology',tags:['biology','photosynthesis','important'],wordCount:72,createdAt:D(-3),updatedAt:D(-3),aiEnhanced:true,
-    summary:'Photosynthesis converts light to chemical energy in chloroplasts via two stages.',
-    flashcards:[{q:'What are the two stages?',a:'Light reactions (thylakoids) and Calvin Cycle (stroma)'},{q:'Overall equation?',a:'6CO₂+6H₂O+light → C₆H₁₂O₆+6O₂'},{q:'Which organelle?',a:'Chloroplast'}],
-    concepts:['ATP','NADPH','Calvin Cycle','Chlorophyll','Chloroplast'] },
-  { id:'note_2',title:'JavaScript Arrays — Core Methods',content:'Array methods: map() transforms each element returning new array. filter() returns elements passing test. reduce() reduces to single value. forEach() iterates without return. find() returns first match. some() returns true if any pass. every() returns true if all pass. flat() flattens nested arrays. flatMap() combines map+flat. slice() extracts portion. splice() modifies array. sort() sorts in place. Array.from() creates from iterable. Spread operator [...arr] clones arrays.',
-    subject:'Web Dev',tags:['javascript','arrays','methods'],wordCount:71,createdAt:D(-5),updatedAt:D(-5),aiEnhanced:false },
-  { id:'note_3',title:'Calculus — Derivative Rules',content:'Power Rule: d/dx(xⁿ)=nxⁿ⁻¹. Chain Rule: d/dx[f(g(x))]=f\'(g(x))·g\'(x). Product Rule: d/dx[u·v]=u\'v+uv\'. Quotient Rule: d/dx[u/v]=(u\'v-uv\')/v². Common: d/dx[sin x]=cos x, d/dx[cos x]=-sin x, d/dx[eˣ]=eˣ, d/dx[ln x]=1/x. Applications: finding maxima/minima, rates of change, optimization problems. Critical points occur where f\'(x)=0 or undefined.',
-    subject:'Mathematics',tags:['calculus','derivatives','rules'],wordCount:68,createdAt:D(-7),updatedAt:D(-7),aiEnhanced:false },
-  { id:'note_4',title:"Newton's Laws of Motion",content:"First Law (Inertia): An object at rest stays at rest, an object in motion stays in motion, unless acted upon by external force. Second Law: F=ma, force equals mass times acceleration. Third Law: Every action has an equal and opposite reaction. Applications: rocket propulsion, friction, projectile motion. Momentum: p=mv. Impulse-Momentum theorem: Ft=Δp.",
-    subject:'Physics',tags:['newton','mechanics','laws'],wordCount:60,createdAt:D(-10),updatedAt:D(-10),aiEnhanced:false },
-];
+function playChime(ctx, startTime) {
+  // Create a pleasant two-tone chime
+  const gain = ctx.createGain();
+  gain.connect(ctx.destination);
 
-const TASKS0 = [
-  { id:'task_1',title:'Complete JS Project',description:'Build full-stack todo app using React and Node.js',subject:'Web Dev',priority:'high',status:'pending',deadline:D(2),estimatedMinutes:180,
-    subtasks:[{title:'Setup React+Vite',estimatedMinutes:20,done:false},{title:'Build UI components',estimatedMinutes:60,done:false},{title:'Add Express backend',estimatedMinutes:60,done:false},{title:'Deploy to Vercel',estimatedMinutes:40,done:false}],createdAt:D(-1) },
-  { id:'task_2',title:'Review Calculus Derivatives',description:'Chain rule, product rule, quotient rule — 30 practice problems',subject:'Mathematics',priority:'medium',status:'pending',deadline:D(4),estimatedMinutes:60,subtasks:[],createdAt:D(-2) },
-  { id:'task_3',title:'Biology Lab Report',description:'Write formal report on photosynthesis experiment results',subject:'Biology',priority:'high',status:'pending',deadline:D(1),estimatedMinutes:120,subtasks:[],createdAt:D(-3) },
-  { id:'task_4',title:'HTML/CSS Quiz Prep',description:'Review flexbox, grid, responsive design',subject:'Web Dev',priority:'low',status:'completed',deadline:D(-1),estimatedMinutes:45,completedAt:D(-2),createdAt:D(-4) },
-  { id:'task_5',title:'Physics Problem Set Ch.3',description:"20 problems on Newton's Laws and momentum",subject:'Physics',priority:'medium',status:'pending',deadline:D(5),estimatedMinutes:90,subtasks:[],createdAt:D(-1) },
-  { id:'task_6',title:'English Essay Draft',description:'Write 1500-word essay on modern literature',subject:'English',priority:'medium',status:'completed',deadline:D(-3),estimatedMinutes:120,completedAt:D(-3),createdAt:D(-6) },
-];
+  // Tone 1: C5 (pleasant bell)
+  const osc1 = ctx.createOscillator();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(523.25, startTime);
+  osc1.connect(gain);
 
-const CHECKINS0 = [
-  { id:'ci_1',mood:4,energy:7,sleepHours:7.5,date:D(-1),aiCoaching:"Great energy today! Perfect for tackling that JavaScript project. Start with 2 Pomodoro sessions before lunch." },
-  { id:'ci_2',mood:2,energy:4,sleepHours:5,date:D(-2),aiCoaching:"Rough day. Focus on review instead of new material. Sleep early tonight — aim for 8 hours." },
-  { id:'ci_3',mood:5,energy:9,sleepHours:8,date:D(-3),aiCoaching:"Peak state! Tackle your hardest subject first. This is your optimal learning window — don't waste it!" },
-  { id:'ci_4',mood:3,energy:6,sleepHours:6.5,date:D(-4),aiCoaching:"Steady day. Stick to your study plan, 25-min focus sessions recommended. Stay hydrated." },
-  { id:'ci_5',mood:4,energy:8,sleepHours:7,date:D(-5),aiCoaching:"Good energy. Great time to work on that JS project you have pending. You're in a learning mode." },
-  { id:'ci_6',mood:3,energy:5,sleepHours:7,date:D(-6),aiCoaching:"Average day. Review your Biology notes — repetition builds retention. Keep it light today." },
-  { id:'ci_7',mood:4,energy:7,sleepHours:8,date:D(-7),aiCoaching:"Well rested and focused. Deep work mode — tackle that Physics problem set you've been avoiding." },
-];
+  // Tone 2: E5 (major third — warm, friendly)
+  const osc2 = ctx.createOscillator();
+  osc2.type = 'triangle';
+  osc2.frequency.setValueAtTime(659.25, startTime);
+  osc2.connect(gain);
 
-const PATHS0 = [
-  { id:'path_1',title:'Full-Stack Web Development',goal:'Become a job-ready full-stack developer',status:'active',totalWeeks:12,currentWeek:5,progress:38,
-    startedAt:D(-30),learningStyle:'visual',hoursPerWeek:10,
-    phases:[
-      { phase:1,title:'HTML & CSS Foundations',weeks:'1-2',status:'completed',topics:['HTML5 Semantics','CSS Flexbox','CSS Grid','Responsive Design'],milestone:'Build a responsive landing page' },
-      { phase:2,title:'JavaScript Core',weeks:'3-5',status:'active',topics:['ES6+ Syntax','DOM Manipulation','Async/Await','Fetch API'],milestone:'Build an interactive web app',currentTopic:'Async/Await' },
-      { phase:3,title:'React Fundamentals',weeks:'6-8',status:'locked',topics:['Components & Props','useState/useEffect','React Router','Context API'],milestone:'Build a multi-page React app' },
-      { phase:4,title:'Backend with Node.js',weeks:'9-12',status:'locked',topics:['Express.js','REST APIs','PostgreSQL','JWT Auth'],milestone:'Deploy a full-stack application' },
-    ],
-    aiTip:"You're on track! JavaScript async/await is crucial — don't rush through it. Understanding Promises deeply will save you hours of debugging later.",
-    milestones:['Week 2: Responsive landing page','Week 5: Interactive web app','Week 8: React SPA','Week 12: Full-stack deployed'] },
-];
+  // Tone 3: G5 (completes the chord — bright, uplifting)
+  const osc3 = ctx.createOscillator();
+  osc3.type = 'sine';
+  osc3.frequency.setValueAtTime(783.99, startTime);
+  osc3.connect(gain);
 
-const SCHEDULE0 = [
-  { id:'sch_1',subject:'Web Dev',topic:'Async/Await deep dive',startTime:'09:00',durationMinutes:90,day:new Date().toISOString().slice(0,10) },
-  { id:'sch_2',subject:'Mathematics',topic:'Integration practice',startTime:'14:00',durationMinutes:60,day:new Date().toISOString().slice(0,10) },
-  { id:'sch_3',subject:'Biology',topic:'Cell division review',startTime:'16:00',durationMinutes:45,day:D(1).slice(0,10) },
-];
+  // Envelope: quick attack, gentle decay
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.4, startTime + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.6);
 
-const VIDEOS0 = [
-  { id:'vid_1',title:'JavaScript Promises & Async/Await Explained',url:'https://www.youtube.com/watch?v=vn3tm0quoqE',subject:'Web Dev',notes:'Really clear explanation. Key: async functions always return a promise.',watched:true,addedAt:D(-5) },
-  { id:'vid_2',title:'Calculus for Beginners — Full Course',url:'https://www.youtube.com/watch?v=WUvTyaaNkzM',subject:'Mathematics',notes:'',watched:false,addedAt:D(-8) },
-  { id:'vid_3',title:'Photosynthesis: Crash Course Biology',url:'https://www.youtube.com/watch?v=g78utcLQrJ4',subject:'Biology',notes:'Covers light reactions really well.',watched:true,addedAt:D(-12) },
-];
+  osc1.start(startTime);
+  osc2.start(startTime + 0.05);
+  osc3.start(startTime + 0.1);
+  osc1.stop(startTime + 0.7);
+  osc2.stop(startTime + 0.7);
+  osc3.stop(startTime + 0.7);
+}
+
+export function playAlarmSound() {
+  stopAlarmSound();
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const ctx = new AudioContextClass();
+    currentAlarmCtx = ctx;
+
+    // If AudioContext is suspended (autoplay policy), resume it
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    // Play initial burst: 3 chimes
+    let t = ctx.currentTime;
+    playChime(ctx, t);
+    playChime(ctx, t + 0.8);
+    playChime(ctx, t + 1.6);
+
+    // Repeat every 3 seconds (persistent ringing until dismissed)
+    alarmLoopTimer = setInterval(() => {
+      if (!currentAlarmCtx || currentAlarmCtx.state === 'closed') {
+        clearInterval(alarmLoopTimer);
+        return;
+      }
+      const now = currentAlarmCtx.currentTime;
+      playChime(currentAlarmCtx, now);
+      playChime(currentAlarmCtx, now + 0.8);
+      playChime(currentAlarmCtx, now + 1.6);
+    }, 3000);
+
+    currentAlarmSource = { stop: () => {} }; // Dummy — cleanup done in stopAlarmSound
+  } catch (e) {
+    console.error('[Alarm Sound] Failed to play:', e);
+  }
+}
+
+export function stopAlarmSound() {
+  if (alarmLoopTimer) {
+    clearInterval(alarmLoopTimer);
+    alarmLoopTimer = null;
+  }
+  if (currentAlarmSource) {
+    try { currentAlarmSource.stop(); } catch (e) {}
+    currentAlarmSource = null;
+  }
+  if (currentAlarmCtx) {
+    try { currentAlarmCtx.close(); } catch (e) {}
+    currentAlarmCtx = null;
+  }
+}
+
+// ── Native OS Notification Helper ─────────────────────────────────
+// Fires a real OS notification that appears even when the tab is in background
+// or the user is in another application
+export function fireNativeNotification(title, body) {
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      const n = new Notification(`⏰ ${title}`, {
+        body,
+        icon: '/favicon.svg',
+        badge: '/favicon.svg',
+        requireInteraction: true, // Stays until user clicks it
+        tag: `axinite-alarm-${Date.now()}`,
+        silent: false // Allow OS notification sound
+      });
+      // When user clicks the notification, focus the app
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+    } else if (Notification.permission === 'default') {
+      // Try to request permission and show if granted
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          fireNativeNotification(title, body);
+        }
+      });
+    }
+  } catch (e) {
+    console.warn('[Native Notification] Failed:', e);
+  }
+}
+
+// ── Service Worker Sync Helper ────────────────────────────────────
+// Sends alarm + schedule data to the background service worker so it can
+// fire notifications even when the tab is not active
+export function syncAlarmsToServiceWorker(alarms, schedule) {
+  try {
+    const data = { alarms: alarms || [], schedule: schedule || [] };
+    
+    // Store in CacheStorage (accessible to both window and SW, survives SW lifecycle kills)
+    if ('caches' in window) {
+      caches.open('axinite-alarm-store').then(store => {
+        store.put('/alarm-data.json', new Response(JSON.stringify(data)));
+      });
+    }
+
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    navigator.serviceWorker.controller.postMessage({
+      type: 'SYNC_ALARM_DATA',
+      payload: data
+    });
+  } catch (e) {
+    console.error('[Sync SW] Error:', e);
+  }
+}
+
+// Keep service worker alive with periodic pings
+let swKeepaliveTimer = null;
+export function startSWKeepalive() {
+  if (swKeepaliveTimer) clearInterval(swKeepaliveTimer);
+  swKeepaliveTimer = setInterval(() => {
+    try {
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'KEEPALIVE' });
+      }
+    } catch (e) {}
+  }, 20000); // Ping every 20s
+}
+
+// ── Clean Slate Defaults (Production) ────────────────────────────────
+const NOTES0 = [];
+const TASKS0 = [];
+const CHECKINS0 = [];
+const PATHS0 = [];
+const SCHEDULE0 = [];
+const VIDEOS0 = [];
+const ACHIEVEMENTS0 = [];
 
 const PROGRESS0 = {
-  subjects:{
-    'Web Dev':    { progress:65,hoursStudied:22,tasksCompleted:8,trend:'+20%'  },
-    'Mathematics':{ progress:42,hoursStudied:14,tasksCompleted:5,trend:'+8%'   },
-    'Biology':    { progress:58,hoursStudied:10,tasksCompleted:4,trend:'+12%'  },
-    'Physics':    { progress:35,hoursStudied:6, tasksCompleted:2,trend:'+5%'   },
-  },
-  weeklyHours:[2,2.5,3.5,2.2,4.0,3.4,1.5],
-  streak:17,bestStreak:32,totalHours:52,tasksCompleted:17,focusSessions:34,thisWeekHours:19.1,
+  subjects:{},
+  weeklyHours:[0,0,0,0,0,0,0],
+  streak:0,bestStreak:0,totalHours:0,tasksCompleted:0,focusSessions:0,thisWeekHours:0,
 };
-
-const ACHIEVEMENTS0 = [
-  { id:'n1',title:'First Note',desc:'Created your first note',icon:'edit_note',color:'var(--p)',cat:'Notes',earnedAt:D(-20) },
-  { id:'s2',title:'Week Warrior',desc:'7-day study streak',icon:'local_fire_department',color:'#fb923c',cat:'Streak',earnedAt:D(-10) },
-  { id:'t1',title:'First Win',desc:'Completed first task',icon:'task_alt',color:'#60a5fa',cat:'Tasks',earnedAt:D(-15) },
-  { id:'t2',title:'Productive',desc:'Completed 10 tasks',icon:'checklist',color:'#60a5fa',cat:'Tasks',earnedAt:D(-5) },
-  { id:'f1',title:'Deep Worker',desc:'Completed 5 focus sessions',icon:'timer',color:'#a78bfa',cat:'Focus',earnedAt:D(-8) },
-  { id:'h1',title:'10 Hours',desc:'Studied 10+ hours total',icon:'schedule',color:'#22d3ee',cat:'Hours',earnedAt:D(-12) },
-];
 
 // ── Reducer ──────────────────────────────────
 function reducer(state, { type, payload }) {
@@ -114,6 +211,34 @@ function reducer(state, { type, payload }) {
     case 'VID_DELETE':  return { ...state, videos:   state.videos.filter(v=>v.id!==payload) };
     case 'ACH_UNLOCK':  return state.achievements.find(a=>a.id===payload.id)?state:{...state,achievements:[...state.achievements,payload]};
     case 'PROGRESS':    return { ...state, progress: { ...state.progress, ...payload } };
+    
+    // Alarms reducer cases
+    case 'ALARM_ADD':    return { ...state, alarms: [payload, ...state.alarms] };
+    case 'ALARM_UPDATE': return { ...state, alarms: state.alarms.map(a=>a.id===payload.id?{...a,...payload}:a) };
+    case 'ALARM_DEL':    return { ...state, alarms: state.alarms.filter(a=>a.id!==payload) };
+    case 'TRIGGER_ALARM':return { ...state, activeAlarm: payload };
+    case 'DISMISS_ALARM':
+      let updatedAlarms = state.alarms || [];
+      if (state.activeAlarm?.alarmId && state.activeAlarm?.isOneOff) {
+        updatedAlarms = (state.alarms || []).map(a => a.id === state.activeAlarm.alarmId ? { ...a, enabled: false } : a);
+      }
+      return { ...state, activeAlarm: null, alarms: updatedAlarms };
+    case 'SNOOZE_ALARM':
+      const snoozeTime = new Date(Date.now() + 5 * 60 * 1000);
+      const snoozeTimeString = snoozeTime.getHours().toString().padStart(2, '0') + ':' + snoozeTime.getMinutes().toString().padStart(2, '0');
+      const snoozedAlarm = {
+        id: 'snooze_' + Date.now(),
+        time: snoozeTimeString,
+        label: `Snooze: ${state.activeAlarm?.title || 'Study Alarm'}`,
+        enabled: true,
+        repeat: [], // one-off
+      };
+      let snoozedAlarms = state.alarms || [];
+      if (state.activeAlarm?.alarmId && state.activeAlarm?.isOneOff) {
+        snoozedAlarms = (state.alarms || []).map(a => a.id === state.activeAlarm.alarmId ? { ...a, enabled: false } : a);
+      }
+      return { ...state, activeAlarm: null, alarms: [snoozedAlarm, ...snoozedAlarms] };
+
     case 'TIMER_TICK':
       const now = Date.now();
       const diff = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
@@ -140,8 +265,9 @@ const round1 = n => Math.round(n*10)/10;
 const DEFAULT_TIMER = { remain: 1500, isRunning: false, duration: 25, subject: 'Web Dev', endTime: 0 };
 
 // ── Versioned Local Storage ─────────────────
-const STORAGE_KEY = 'los_v3';
-const STORAGE_META_KEY = 'los_v3_meta';
+const STORAGE_KEY = 'los_v5';
+const STORAGE_META_KEY = 'los_v5_meta';
+const DATA_VERSION = 5; // Bump this to invalidate all cached + cloud data
 
 function loadState() {
   try { 
@@ -155,6 +281,8 @@ function loadState() {
     if (!data.paths) data.paths = [];
     if (!data.checkIns) data.checkIns = [];
     if (!data.schedule) data.schedule = [];
+    if (!data.alarms) data.alarms = [];
+    if (!data.activeAlarm) data.activeAlarm = null;
     if (!data.progress) data.progress = PROGRESS0;
     return data;
   } catch(e) { 
@@ -166,7 +294,7 @@ function loadState() {
 function saveLocal(state) {
   try {
     // Strip transient data to reduce storage size
-    const toSave = { ...state };
+    const toSave = { ...state, _dataVersion: DATA_VERSION };
     // Reset timer running state (not meaningful across sessions)
     if (toSave.timer?.isRunning) {
       toSave.timer = { ...toSave.timer, isRunning: false, endTime: 0, remain: (toSave.timer.duration || 25) * 60 };
@@ -182,30 +310,82 @@ function saveLocal(state) {
   }
 }
 
-/**
- * Smart merge: compare timestamps. Cloud wins if it was updated more recently,
- * otherwise local wins. This prevents data loss from stale overwrites.
- */
 function smartMerge(localState, cloudData) {
   if (!cloudData) return localState;
   if (!localState) return cloudData;
   
-  // Deep merge: prefer cloud arrays if they're longer (more data),
-  // but keep local timer state (it's transient)
   const merged = { ...cloudData };
   
   // Always keep local timer (it's tab-specific)
   merged.timer = localState.timer || DEFAULT_TIMER;
   
-  // For each collection, pick whichever has more items (simple heuristic)
-  // In production you'd use item-level timestamps, but this is robust enough
-  const collections = ['notes', 'tasks', 'checkIns', 'paths', 'schedule', 'videos', 'achievements'];
+  // ── Local-First Smart Merge Strategy ──────────────────────────────
+  // Local storage holds COMPLETE uncompressed history.
+  // Cloud holds only the last 15 days of active items + archiveDigest.
+  // We combine both sets and resolve duplicate IDs by choosing the one with the latest timestamp.
+  const collections = ['notes', 'tasks', 'checkIns', 'paths', 'schedule', 'videos', 'achievements', 'alarms'];
   collections.forEach(key => {
     const local = localState[key] || [];
     const cloud = cloudData[key] || [];
-    // Use cloud data if it's the same size or bigger
-    merged[key] = cloud.length >= local.length ? cloud : local;
+
+    const mergedMap = new Map();
+    
+    // Add local items
+    local.forEach(item => {
+      if (item && item.id) {
+        mergedMap.set(item.id, item);
+      }
+    });
+
+    // Merge cloud items (latest timestamp wins for duplicates)
+    cloud.forEach(item => {
+      if (item && item.id) {
+        const existing = mergedMap.get(item.id);
+        if (!existing) {
+          mergedMap.set(item.id, item);
+        } else {
+          const localTime = new Date(existing.updatedAt || existing.completedAt || existing.date || existing.earnedAt || 0).getTime();
+          const cloudTime = new Date(item.updatedAt || item.completedAt || item.date || item.earnedAt || 0).getTime();
+          if (cloudTime > localTime) {
+            // Keep existing localized fields if present (e.g. offline edits)
+            mergedMap.set(item.id, { ...existing, ...item });
+          }
+        }
+      }
+    });
+
+    let chosen = Array.from(mergedMap.values());
+
+    // Surgical achievements recovery on new device: rebuild rich metadata from local manifest
+    if (key === 'achievements' && chosen.length > 0) {
+      chosen = chosen.map(ca => {
+        const la = local.find(x => x.id === ca.id);
+        return la ? { ...la, ...ca } : ca;
+      });
+    }
+
+    // Surgical check-ins on new device: ensure AI coaching text is present
+    if (key === 'checkIns' && chosen.length > 0) {
+      chosen = chosen.map(cc => {
+        const lc = local.find(x => x.id === cc.id);
+        return {
+          ...cc,
+          aiCoaching: cc.aiCoaching || lc?.aiCoaching || '',
+          aiStrategy: cc.aiStrategy || lc?.aiStrategy || ''
+        };
+      });
+    }
+
+    merged[key] = chosen;
   });
+
+  // Merge archiveDigest (monthly summaries of old data — cloud may have digests local doesn't)
+  if (cloudData.archiveDigest) {
+    merged.archiveDigest = {
+      ...(localState.archiveDigest || {}),
+      ...cloudData.archiveDigest
+    };
+  }
 
   // Progress: pick whichever has more total hours
   if (localState.progress?.totalHours > (cloudData.progress?.totalHours || 0)) {
@@ -216,10 +396,13 @@ function smartMerge(localState, cloudData) {
 }
 
 const INIT = loadState() || {
-  user: { name: 'Student', email: 'student@cygnera.os', goal: 'Master the curriculum' },
+  _dataVersion: DATA_VERSION,
+  user: { name: 'Student', email: 'student@axinite.os', goal: 'Master the curriculum' },
   notes:NOTES0, tasks:TASKS0, checkIns:CHECKINS0, paths:PATHS0,
   schedule:SCHEDULE0, videos:VIDEOS0, progress:PROGRESS0, achievements:ACHIEVEMENTS0,
   timer: DEFAULT_TIMER,
+  alarms: [],
+  activeAlarm: null,
 };
 
 // ── Provider ────────────────────────────────
@@ -286,19 +469,71 @@ export function AppProvider({ children }) {
 
       Promise.all([p1, p2]).then(([cloudData, cloudNotes]) => {
         let merged = stateRef.current;
+        const cloudVersion = cloudData?._dataVersion || 0;
         
-        if (cloudData) {
+        if (cloudData && cloudVersion >= DATA_VERSION) {
           merged = smartMerge(merged, cloudData);
-        }
-        
-        if (cloudNotes && cloudNotes.length > 0) {
-          // Relational notes win over the monolithic blob notes
-          merged = { ...merged, notes: cloudNotes };
-        }
+          
+          if (cloudNotes) {
+            // Merge local and cloud notes, preserving local edits if more recent
+            const mergedNotesMap = new Map();
+            const localNotes = stateRef.current.notes || [];
+            const noteFlashcards = cloudData?.noteFlashcards || {};
 
-        dispatch({ type: 'SYNC_CLOUD', payload: merged });
-        saveLocal(merged);
-        setSyncStatus('synced');
+            localNotes.forEach(ln => {
+              if (ln && ln.id) mergedNotesMap.set(ln.id, ln);
+            });
+
+            cloudNotes.forEach(cn => {
+              if (cn && cn.id) {
+                const existing = mergedNotesMap.get(cn.id);
+                const localTime = new Date(existing?.updatedAt || 0).getTime();
+                const cloudTime = new Date(cn.updatedAt || 0).getTime();
+                
+                if (!existing || cloudTime > localTime) {
+                  mergedNotesMap.set(cn.id, {
+                    ...cn,
+                    flashcards: existing?.flashcards?.length ? existing.flashcards : (noteFlashcards[cn.id] || cn.flashcards || [])
+                  });
+                }
+              }
+            });
+
+            merged = { 
+              ...merged, 
+              notes: Array.from(mergedNotesMap.values())
+            };
+          }
+          
+          dispatch({ type: 'SYNC_CLOUD', payload: merged });
+          saveLocal(merged);
+          setSyncStatus('synced');
+        } else if (cloudData || cloudNotes?.length > 0) {
+          console.log('[Sync] Discarding stale cloud data (v' + cloudVersion + ' < v' + DATA_VERSION + ')');
+          
+          // Force save the clean empty state (v5) to the cloud to overwrite the stale record
+          setSyncStatus('syncing');
+          
+          const clearPromises = [
+            db.saveUserData(user.id, merged),
+            supabase ? supabase.from('notes').delete().eq('user_id', user.id) : Promise.resolve()
+          ];
+          
+          Promise.all(clearPromises).then(() => {
+            dispatch({ type: 'SYNC_CLOUD', payload: merged });
+            saveLocal(merged);
+            setSyncStatus('synced');
+            console.log('[Sync] ✓ Database wiped and initialized to v' + DATA_VERSION);
+          }).catch(err => {
+            console.error('[Sync] Clear failed:', err);
+            setSyncStatus('error');
+          });
+        } else {
+          // No cloud data at all (brand new user signup)
+          dispatch({ type: 'SYNC_CLOUD', payload: merged });
+          saveLocal(merged);
+          setSyncStatus('synced');
+        }
       }).catch(err => {
         console.error('[Sync] Pull failed:', err);
         setSyncStatus('error');
@@ -310,7 +545,8 @@ export function AppProvider({ children }) {
   // Generates a hash of meaningful data (excludes timer ticks)
   const getStateHash = useCallback((s) => {
     const meaningful = {
-      // notes is now synced surgically, so we exclude it from the monolithic hash
+      // Include notes in the hash so local storage is updated upon note modifications
+      notes: s.notes?.map(n => `${n.id}-${n.updatedAt}`).join(','),
       tasks: s.tasks?.map(t => t.id + t.status).join(','),
       checkIns: s.checkIns?.length,
       paths: s.paths?.length,
@@ -361,16 +597,50 @@ export function AppProvider({ children }) {
       saveLocal(stateRef.current);
       
       // If there's a pending cloud sync, try to flush it
-      if (pendingSync.current && isAuth && user?.id && navigator.sendBeacon) {
-        // sendBeacon is reliable during page unload
+      if (pendingSync.current && isAuth && user?.id) {
+        // Read auth token from localStorage (avoiding async await inside unload)
+        const rawSession = localStorage.getItem('sb-cihpvkrvepsctepxwmox-auth-token');
+        let token = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (rawSession) {
+          try {
+            const session = JSON.parse(rawSession);
+            if (session?.access_token) {
+              token = session.access_token;
+            }
+          } catch (e) {}
+        }
+
+        const cleanData = { ...stateRef.current };
+        delete cleanData.notes; // Notes are saved surgically
+        if (cleanData.timer) {
+          cleanData.timer = { 
+            ...cleanData.timer, 
+            isRunning: false, 
+            endTime: 0,
+            remain: (cleanData.timer.duration || 25) * 60 
+          };
+        }
+
         const payload = JSON.stringify({
           user_id: user.id,
-          data: stateRef.current,
+          data: cleanData,
           updated_at: new Date().toISOString()
         });
-        // Note: sendBeacon to Supabase REST API requires CORS setup
-        // This is a best-effort attempt; the next login will sync anyway
-        console.log('[Sync] Flushing pending sync before page unload');
+
+        // Use standard fetch with keepalive: true to securely sync even as the browser tab closes
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/user_data`, {
+          method: 'POST',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: payload,
+          keepalive: true
+        }).catch(err => {
+          console.error('[Sync] Keepalive unload sync failed:', err);
+        });
       }
     };
 
@@ -412,41 +682,148 @@ export function AppProvider({ children }) {
     });
   }, [state.notes.length, state.tasks.length, state.progress.streak, state.progress.focusSessions]);
 
-  // ── Session Auto-Trigger ───────────────────
+  // ── Session Auto-Trigger & Alarms & Reminders Engine ───────────────────
   const lastTriggered = useRef(null);
+  const triggeredSet = useRef(new Set()); // Track ALL triggered IDs per minute
   const navigate = useNavigate();
 
+  // Listen for Service Worker messages (alarms triggered while tab was in background)
   useEffect(() => {
-    const checkSchedule = () => {
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleSWMessage = (event) => {
+      const { type, payload } = event.data || {};
+      if (type === 'ALARM_TRIGGERED') {
+        // SW fired a notification while we were in background — also show in-app overlay
+        playAlarmSound();
+        dispatch({
+          type: 'TRIGGER_ALARM',
+          payload: {
+            title: payload.title,
+            desc: payload.desc,
+            alarmId: payload.alarmId,
+            isOneOff: payload.tag === 'reminder'
+          }
+        });
+      }
+      if (type === 'DISMISS_ALARM') {
+        stopAlarmSound();
+        dispatch({ type: 'DISMISS_ALARM' });
+      }
+      if (type === 'SNOOZE_ALARM') {
+        stopAlarmSound();
+        dispatch({ type: 'SNOOZE_ALARM' });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+  }, []);
+
+  // Start service worker keepalive
+  useEffect(() => {
+    startSWKeepalive();
+    return () => {};
+  }, []);
+
+  // Sync alarm data to service worker whenever alarms or schedule change
+  useEffect(() => {
+    syncAlarmsToServiceWorker(state.alarms, state.schedule);
+  }, [state.alarms, state.schedule]);
+
+  useEffect(() => {
+    const checkScheduleAndAlarms = () => {
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
       const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-      
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const minuteKey = `${today}_${currentTime}`;
+
+      // Reset triggered set each new minute
+      if (triggeredSet.current._minuteKey !== minuteKey) {
+        triggeredSet.current = new Set();
+        triggeredSet.current._minuteKey = minuteKey;
+      }
+
+      // 1. Session Exact Start Auto-Trigger (Focus redirection)
       const session = state.schedule.find(s => s.day === today && s.startTime === currentTime);
-      
-      if (session && lastTriggered.current !== session.id) {
+      if (session && !triggeredSet.current.has(session.id)) {
+        triggeredSet.current.add(session.id);
         lastTriggered.current = session.id;
         
-        // Notify user
+        fireNativeNotification(
+          `Time for ${session.subject}!`,
+          `Your ${session.subject} session is starting now. Let's go! 🚀`
+        );
         toast(`Time for ${session.subject} session!`, { 
           icon: '🚀',
           duration: 5000,
           style: { border: '1.5px solid var(--p)', background: 'var(--s2)' }
         });
 
-        // Set timer settings
         dispatch({ type: 'TIMER_SET_SUB', payload: session.subject });
         dispatch({ type: 'TIMER_SET_DUR', payload: session.durationMinutes });
         dispatch({ type: 'TIMER_START' });
-
-        // Redirect
         navigate('/focus');
       }
+
+      // 2. 5-Minute Pre-Task Reminder Notification
+      state.schedule.forEach(s => {
+        if (s.day === today) {
+          const [sh, sm] = s.startTime.split(':').map(Number);
+          const sTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm, 0);
+          const diffMs = sTime.getTime() - now.getTime();
+          const diffMins = Math.round(diffMs / 60000);
+
+          if (diffMins === 5) {
+            const remId = `rem_5m_${s.id}_${today}_${s.startTime}`;
+            if (!triggeredSet.current.has(remId)) {
+              triggeredSet.current.add(remId);
+              lastTriggered.current = remId;
+
+              const title = 'Upcoming Study Session';
+              const desc = `Your scheduled "${s.subject}" session (${s.topic || ''}) starts in 5 minutes!`;
+
+              playAlarmSound();
+              fireNativeNotification(title, desc);
+              dispatch({
+                type: 'TRIGGER_ALARM',
+                payload: { title, desc, alarmId: remId, isOneOff: true }
+              });
+            }
+          }
+        }
+      });
+
+      // 3. Custom Alarms Triggering
+      (state.alarms || []).forEach(alarm => {
+        if (alarm.enabled && alarm.time === currentTime) {
+          const alarmTriggerId = `alarm_${alarm.id}_${today}_${currentTime}`;
+          if (!triggeredSet.current.has(alarmTriggerId)) {
+            const isRepeatToday = alarm.repeat.length === 0 || alarm.repeat.includes(dayOfWeek);
+            if (isRepeatToday) {
+              triggeredSet.current.add(alarmTriggerId);
+              lastTriggered.current = alarmTriggerId;
+
+              const title = alarm.label || 'Study Alarm';
+              const desc = `Scheduled alarm for ${alarm.time}`;
+
+              playAlarmSound();
+              fireNativeNotification(title, desc);
+              dispatch({
+                type: 'TRIGGER_ALARM',
+                payload: { title, desc, alarmId: alarm.id, isOneOff: alarm.repeat.length === 0 }
+              });
+            }
+          }
+        }
+      });
     };
 
-    const interval = setInterval(checkSchedule, 30000); // Check every 30s
+    const interval = setInterval(checkScheduleAndAlarms, 15000); // Check every 15s
+    checkScheduleAndAlarms(); // Run immediately on mount/update
     return () => clearInterval(interval);
-  }, [state.schedule, navigate]);
+  }, [state.schedule, state.alarms, navigate]);
 
   // Computed
   const pending   = useMemo(()=>state.tasks.filter(t=>t.status==='pending'),[state.tasks]);
@@ -463,7 +840,7 @@ export function AppProvider({ children }) {
   const A = useMemo(() => ({
     note: {
       add:    n  => {
-        const newNote = { ...n, id:genId('note'), createdAt:new Date().toISOString(), updatedAt:new Date().toISOString() };
+        const newNote = { id: genId('note'), ...n, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
         dispatch({ type:'NOTE_ADD', payload: newNote });
         // Cloud sync handled async
         const uid = stateRef.current?.user?.id;
@@ -482,24 +859,32 @@ export function AppProvider({ children }) {
       },
     },
     task: {
-      add:    t  => dispatch({ type:'TASK_ADD',    payload:{...t,id:genId('task'),status:'pending',createdAt:new Date().toISOString()} }),
+      add:    t  => dispatch({ type:'TASK_ADD',    payload:{ id: genId('task'), status: 'pending', ...t, createdAt: new Date().toISOString() } }),
       update: t  => dispatch({ type:'TASK_UPDATE', payload:t }),
       done:   id => dispatch({ type:'TASK_DONE',   payload:id }),
       remove: id => dispatch({ type:'TASK_DELETE', payload:id }),
     },
-    checkin: { add: c => dispatch({ type:'CI_ADD',payload:{...c,id:genId('ci'),date:new Date().toISOString()} }) },
+    checkin: { add: c => dispatch({ type:'CI_ADD',payload:{ id: genId('ci'), ...c, date: new Date().toISOString() } }) },
     path: {
-      add:    p  => dispatch({ type:'PATH_ADD',    payload:{...p,id:genId('path'),startedAt:new Date().toISOString()} }),
+      add:    p  => dispatch({ type:'PATH_ADD',    payload:{ id: genId('path'), ...p, startedAt: new Date().toISOString() } }),
       update: p  => dispatch({ type:'PATH_UPDATE', payload:p }),
       remove: id => dispatch({ type:'PATH_DELETE', payload:id }),
     },
     schedule: {
-      add:    s  => dispatch({ type:'SCHED_ADD', payload:{...s,id:genId('sch')} }),
+      add:    s  => dispatch({ type:'SCHED_ADD', payload:{ id: genId('sch'), ...s } }),
       update: s  => dispatch({ type:'SCHED_UPDATE', payload:s }),
       remove: id => dispatch({ type:'SCHED_DEL', payload:id }),
     },
+    alarm: {
+      add:    s  => dispatch({ type:'ALARM_ADD', payload:{ id: genId('alm'), enabled: true, repeat: [], label: 'Study Alarm', ...s } }),
+      update: s  => dispatch({ type:'ALARM_UPDATE', payload:s }),
+      remove: id => dispatch({ type:'ALARM_DEL', payload:id }),
+      trigger:payload => dispatch({ type:'TRIGGER_ALARM', payload }),
+      dismiss:() => { stopAlarmSound(); dispatch({ type:'DISMISS_ALARM' }); },
+      snooze: () => { stopAlarmSound(); dispatch({ type:'SNOOZE_ALARM' }); }
+    },
     video: {
-      add:    v  => dispatch({ type:'VID_ADD',    payload:{...v,id:genId('vid'),addedAt:new Date().toISOString()} }),
+      add:    v  => dispatch({ type:'VID_ADD',    payload:{ id: genId('vid'), ...v, addedAt: new Date().toISOString() } }),
       update: v  => dispatch({ type:'VID_UPDATE', payload:v }),
       remove: id => dispatch({ type:'VID_DELETE', payload:id }),
     },
@@ -532,7 +917,7 @@ export function AppProvider({ children }) {
     };
   }, [
     state.notes, state.tasks, state.checkIns, state.paths, state.schedule, state.videos,
-    state.achievements, state.progress, state.user, user, // Added user to dependencies
+    state.achievements, state.progress, state.user, user, state.alarms, state.activeAlarm,
     pending, completed, topTasks, deadlines, todayCI, burnout, activePath, todaySched, allAchs, syncStatus, A
   ]);
 

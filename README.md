@@ -1,4 +1,4 @@
-# 🚀 LEARNER OS v1.0 — AI-Powered Study Platform
+# 🚀 AXINITE OS v1.0 — AI-Powered Study Platform
 
 > Premium, full-stack study dashboard. Cognitive Sanctuary design. DeepSeek AI integration. 43 features. Zero compromises.
 
@@ -81,7 +81,7 @@ npm run dev            # http://localhost:3000
 - ✅ **AI Timer Personalization** (optimal session length based on history)
 
 ### Learning Paths
-- ✅ Create Learning Path (goal, style, hours/week)
+- ✅ Create Learning Path (goal, style, level, hours/week)
 - ✅ View Active Paths
 - ✅ Phase Tracking (locked/active/completed)
 - ✅ Progress Milestones
@@ -213,4 +213,4 @@ npm run build
 
 ---
 
-**Learner OS v1.0 · Built for Indian students · Powered by DeepSeek AI**
+**AXINITE OS v1.0 · Built for ambitious learners · Powered by Axinite AI**

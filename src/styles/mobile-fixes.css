@@ -1,0 +1,546 @@
+/* ═══════════════════════════════════════════════════════════
+   MOBILE-ONLY OPTIMIZATIONS  
+   All rules are inside max-width queries — desktop is UNTOUCHED.
+   Imported once in globals.css or main entry.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Global Mobile Breathing Room ──────────────────────── */
+@media (max-width: 768px) {
+
+  /* Ensure every .page has comfortable side padding */
+  .page {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    padding-bottom: 130px !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Root tweaks for mobile comfort */
+  :root {
+    --card-padding: 14px !important;
+    --gap-card: 10px !important;
+    --gap-page: 14px !important;
+  }
+
+  /* ── Page Title sizing ─────────────────────────────────── */
+  .page-title {
+    font-size: clamp(2.4rem, 10vw, 3rem) !important;
+    line-height: 1.1 !important;
+    margin-bottom: 4px !important;
+    word-break: break-word !important;
+  }
+
+  /* ── Card overflow prevention ──────────────────────────── */
+  .card {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    word-break: break-word !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Typography — prevent overflow & improve readability ─ */
+  h1 { font-size: clamp(1.35rem, 5vw, 1.8rem) !important; }
+  h2 { font-size: clamp(1.1rem, 4vw, 1.5rem) !important; }
+  h3 { font-size: clamp(0.95rem, 3.5vw, 1.2rem) !important; }
+  h4 { font-size: 0.95rem !important; }
+
+  /* ── All flex containers: prevent horizontal overflow ──── */
+  [style*="display: flex"],
+  [style*="display:flex"] {
+    max-width: 100%;
+  }
+
+  /* ── Grid auto-fit safety: never exceed viewport ───────── */
+  [style*="gridTemplateColumns"] {
+    max-width: 100% !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     PROGRESS PAGE — Mobile Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Tab bar: horizontal scroll with breathing room */
+  .page > div:nth-child(3) {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Biometric + Task Telemetry Grid — 2 cols on mobile */
+  .card [style*="gridTemplateColumns: repeat(auto-fit, minmax(130px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Biometric telemetry cards: tighter padding */
+  .card [style*="gridTemplateColumns: repeat(auto-fit, minmax(130px"] > div {
+    padding: 12px 8px !important;
+  }
+
+  .card [style*="gridTemplateColumns: repeat(auto-fit, minmax(130px"] > div p[style*="fontSize: 20"] {
+    font-size: 16px !important;
+  }
+
+  /* Strengths & Improvements grid — stack vertically */
+  .card [style*="gridTemplateColumns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Intelligence briefing header — stack vertically */
+  .card [style*="gap: 18"][style*="marginBottom: 4"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Trend badge on intelligence panel — full width */
+  .card [style*="borderRadius: 99"][style*="gap: 7"] {
+    width: fit-content !important;
+  }
+
+  /* Intelligence briefing headline — smaller */
+  .card p[style*="fontSize: 22"] {
+    font-size: 17px !important;
+    line-height: 1.3 !important;
+  }
+
+  /* Strategy + Insights cards — reduce padding */
+  .card[style*="padding: 28"] {
+    padding: 16px !important;
+  }
+
+  /* Strategy session/break row — stack if needed */
+  .card [style*="display: flex"][style*="gap: 14"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* History log items — stack vertically */
+  .card div[style*="justifyContent: space-between"][style*="padding: 14px 18px"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    padding: 12px 14px !important;
+  }
+
+  /* History log metrics row — wrap */
+  .card div[style*="justifyContent: space-between"][style*="padding: 14px 18px"] > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  /* Burnout risk card — stack */
+  .card[style*="gap: 16"][style*="flexWrap: wrap"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* Average stats grid — 2 cols */
+  [style*="gridTemplateColumns: repeat(auto-fit, minmax(140px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     FOCUS TIMER PAGE — Mobile Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Focus header stats — smaller padding */
+  .card-header-row > div[style*="padding: 12px 20px"] {
+    padding: 8px 14px !important;
+  }
+
+  .card-header-row > div[style*="padding: 12px 20px"] p[style*="fontSize: 20"] {
+    font-size: 16px !important;
+  }
+
+  /* Focus card main container — less padding */
+  .card[style*="padding: '32px'"],
+  .card[style*="padding: 32px"] {
+    padding: 16px !important;
+  }
+
+  /* Focus control buttons row — wrap */
+  div[style*="gap: 16"][style*="alignItems: center"] {
+    flex-wrap: wrap !important;
+  }
+
+  /* Start/Pause button — full width on mobile */
+  div[style*="gap: 16"][style*="alignItems: center"] button[style*="flex: 1"] {
+    flex: 1 1 100% !important;
+    order: -1 !important;
+  }
+
+  /* Round control buttons — move below */
+  div[style*="gap: 16"][style*="alignItems: center"] button[style*="width: 56"] {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  /* SoundScape — full width */
+  div[style*="maxWidth: 420"] {
+    max-width: 100% !important;
+  }
+
+  /* Sound buttons — tighter */
+  div[style*="flexWrap: wrap"][style*="justifyContent: center"] button {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+
+  /* Subject selector — less horizontal padding */
+  div[style*="padding: 14px 24px"][style*="borderRadius: var(--r-xl)"] {
+    padding: 12px 16px !important;
+  }
+
+  /* Session History / Mastery grid below timer */
+  div[style*="gridTemplateColumns: 1fr 1fr"][style*="gap: 24"] {
+    grid-template-columns: 1fr !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     DASHBOARD — Header action buttons fix
+     ═══════════════════════════════════════════ */
+
+  .dashboard-header-actions {
+    width: 100% !important;
+    gap: 10px !important;
+    margin-top: 8px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     NOTES PAGE — Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Editor inner container */
+  .editor-inner-container {
+    padding: 20px 14px !important;
+  }
+
+  .editor-title-input {
+    font-size: 24px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     VIDEOS PAGE — Fixes
+     ═══════════════════════════════════════════ */
+
+  .video-studio-modal {
+    flex-direction: column !important;
+    max-height: 90dvh !important;
+  }
+
+  .video-studio-sidebar {
+    width: 100% !important;
+    max-height: 35vh !important;
+    border-left: none !important;
+    border-top: 1px solid var(--surface-b) !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     SCHEDULE PAGE — Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Prevent horizontal overflow of schedule grids */
+  .card table,
+  .card [style*="overflowX"] {
+    max-width: 100% !important;
+  }
+
+  /* Schedule header buttons — stack on mobile */
+  .page > .fadeup:first-child > div:last-child {
+    flex-wrap: wrap !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     SETTINGS PAGE — Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Settings section cards — reduce padding */
+  .card[style*="padding: 28px"],
+  .card[style*="padding: '28px'"] {
+    padding: 16px !important;
+  }
+
+  /* Settings grid — full single column */
+  .settings-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .settings-col-left,
+  .settings-col-right {
+    grid-column: span 1 !important;
+    gap: 16px !important;
+  }
+
+  /* Settings rows — reduce gap for tight layouts */
+  .settings-grid .card {
+    padding: 16px 14px !important;
+  }
+
+  /* Learning style grid — 2x2 on mobile */
+  .settings-grid [style*="gridTemplateColumns: repeat(2, 1fr)"][style*="gap: 12"] {
+    gap: 8px !important;
+  }
+
+  /* Stats grid in settings — 2 columns */
+  .settings-grid .grid-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* AI feature tags — smaller on mobile */
+  .settings-grid [style*="flexWrap: wrap"][style*="gap: 6"] span {
+    font-size: 8.5px !important;
+    padding: 2px 6px !important;
+  }
+
+  /* Focus shield strictness buttons — smaller text */
+  .settings-grid [style*="gap: 3"][style*="borderRadius: 10"] button {
+    padding: 5px 8px !important;
+    font-size: 8.5px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     TASKS PAGE — Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Task cards grid — single column on mobile */
+  [style*="gridTemplateColumns: repeat(auto-fill, minmax(min(100%, 360px)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Task card padding — breathable */
+  .card[style*="padding: '20px'"],
+  .card[style*="padding: 20px"] {
+    padding: 14px !important;
+  }
+
+  /* Task header — prevent overflow */
+  .page > .fadeup:first-child {
+    gap: 12px !important;
+  }
+
+  /* Construct Task button — full width on mobile */
+  .page > .fadeup:first-child > .btn.btn-primary {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     LEARNING PATHS PAGE — Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Path cards grid — single column */
+  [style*="gridTemplateColumns: repeat(auto-fill,minmax(300px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Path stat cards — 3 columns minimum */
+  [style*="gridTemplateColumns: repeat(auto-fit, minmax(min(100%, 140px)"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     BADGES GRID — Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Ensure badges grid doesn't overflow */
+  .tilt-container[style*="gridTemplateColumns: repeat(auto-fill,minmax(140px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     NETWORK / COMMUNITY PAGES
+     ═══════════════════════════════════════════ */
+
+  /* Cards with side-by-side layout */
+  .card[style*="flexDirection: row"] {
+    flex-direction: column !important;
+  }
+
+  /* Network profile modal — mobile safe */
+  div[style*="zIndex: 200"][style*="alignItems: center"],
+  div[style*="zIndex:200"][style*="alignItems:center"] {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  div[style*="maxWidth: 440"][style*="borderRadius: 20"] {
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 85dvh !important;
+  }
+
+  /* Network tab bar — scrollable */
+  .page > .fadeup > div[style*="overflowX"] {
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     REPORT / DETAIL MODALS — Mobile-safe
+     ═══════════════════════════════════════════ */
+
+  /* Report modal — reduce padding on mobile */
+  div[style*="maxWidth: 600"] {
+    max-width: 100% !important;
+    margin: 0 8px !important;
+  }
+
+  div[style*="maxWidth: 420"] {
+    max-width: 100% !important;
+  }
+
+  /* Report modal metrics grid — 2 cols */
+  div[style*="gridTemplateColumns: repeat(auto-fit, minmax(140px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Report achievements grid — stack */
+  div[style*="gridTemplateColumns: repeat(auto-fit, minmax(200px"] {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Grade display — smaller on mobile */
+  div[style*="width: 80"][style*="height: 80"] {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     AURA CHECK-IN POPUP — Mobile position
+     ═══════════════════════════════════════════ */
+
+  /* Ambient check-in popup: ensure it doesn't overflow */
+  div[style*="width: '330px'"],
+  div[style*="width: 330px"] {
+    width: calc(100vw - 32px) !important;
+    right: 16px !important;
+    bottom: 80px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     AURA DIAL NAV — Breathing clearance
+     ═══════════════════════════════════════════ */
+
+  /* Extra bottom clearance for content above the AuraDial */
+  #los-main {
+    padding-bottom: 130px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     LEARNING PATHS PAGE
+     ═══════════════════════════════════════════ */
+
+  /* Path cards — ensure they stack */
+  .grid-3 {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     LOGIN / SIGNUP AUTH PAGES — Mobile Fixes
+     ═══════════════════════════════════════════ */
+
+  /* Google account chooser modal — mobile safe */
+  div[style*="maxWidth: 400"][style*="borderRadius: var(--r-lg)"] {
+    max-width: calc(100vw - 32px) !important;
+  }
+
+
+  /* ═══════════════════════════════════════════
+     GENERIC SAFETY NETS
+     ═══════════════════════════════════════════ */
+
+  /* Prevent ANY image from overflowing */
+  img, video, iframe, svg, canvas {
+    max-width: 100% !important;
+    height: auto;
+  }
+
+  /* Prevent long text from breaking layout */
+  * {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
+  /* Ensure no horizontal scrollbar ever appears */
+  body, html {
+    overflow-x: hidden !important;
+  }
+
+  #los-main {
+    overflow-x: hidden !important;
+  }
+
+  /* Prevent touch callout and text selection on interactive elements */
+  button, a, .icon-btn, .btn {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth scrolling for all scrollable containers */
+  [style*="overflowY: auto"],
+  [style*="overflow-y: auto"],
+  [style*="overflowX: auto"],
+  [style*="overflow-x: auto"] {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
+
+
+/* ── Very Small Phones (≤360px) ─────────────────────────── */
+@media (max-width: 360px) {
+  .page {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .page-title {
+    font-size: 2rem !important;
+  }
+
+  /* Smaller cards on tiny screens */
+  .card {
+    padding: 12px !important;
+  }
+
+  /* Badge grid — single column on tiny phones */
+  .tilt-container[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Mood buttons — even tighter */
+  div[style*="gridTemplateColumns: repeat(5"] button {
+    padding: 8px 2px !important;
+  }
+
+  /* Stats grids — single column on very small screens */
+  .stats-grid-responsive {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Settings learning style grid — single column */
+  .settings-grid [style*="gridTemplateColumns: repeat(2, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+}
