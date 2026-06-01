@@ -85,9 +85,21 @@ function ActivityBars({ data, total, compact = false }) {
   const currentPath = solvePath(currPts);
   const ghostPath = solvePath(ghostPts);
 
+  const chartRectRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (chartRef.current) {
+      chartRectRef.current = chartRef.current.getBoundingClientRect();
+    }
+  };
+
   const handleMouseMove = (e) => {
-    if (!chartRef.current) return;
-    const rect = chartRef.current.getBoundingClientRect();
+    let rect = chartRectRef.current;
+    if (!rect && chartRef.current) {
+      rect = chartRef.current.getBoundingClientRect();
+      chartRectRef.current = rect;
+    }
+    if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const idx = Math.round(((x - 3) / 94) * (data.length - 1));
     setHoverIdx(Math.max(0, Math.min(data.length - 1, idx)));
@@ -97,8 +109,9 @@ function ActivityBars({ data, total, compact = false }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
       <div
         ref={chartRef}
+        onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIdx(null)}
+        onMouseLeave={() => { setHoverIdx(null); chartRectRef.current = null; }}
         style={{ position: 'relative', height: compact ? 150 : 210, width: '100%', marginTop: 10, background: isDark ? 'linear-gradient(180deg, #0B0E14 0%, #0D1117 100%)' : 'linear-gradient(180deg, #f8faf8 0%, #f0f4f0 100%)', borderRadius: compact ? 14 : 18, overflow: 'hidden', cursor: 'crosshair', border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}`, boxShadow: isDark ? 'inset 0 0 60px rgba(0,0,0,0.8), 0 8px 32px rgba(0,0,0,0.4)' : 'inset 0 0 40px rgba(0,0,0,0.03), 0 4px 20px rgba(0,0,0,0.06)' }}
       >
         {/* Minimalist Technical Grid */}

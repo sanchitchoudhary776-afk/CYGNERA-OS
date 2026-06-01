@@ -373,6 +373,30 @@ function AuraDial() {
     setIsOpen(false);
   }, [location.pathname]);
 
+  const hubCenterRef = useRef(null);
+
+  // Cache the hub coordinates when open or resized
+  useEffect(() => {
+    if (isMobile || hasTouch) return;
+    
+    const updateCenter = () => {
+      if (hubRef.current) {
+        const rect = hubRef.current.getBoundingClientRect();
+        hubCenterRef.current = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+      }
+    };
+
+    if (isOpen) {
+      updateCenter();
+    }
+
+    window.addEventListener('resize', updateCenter, { passive: true });
+    return () => window.removeEventListener('resize', updateCenter);
+  }, [isOpen, isMobile, hasTouch]);
+
   // Desktop: close when mouse leaves the orbit radius (RAF-throttled)
   useEffect(() => {
     if (isMobile || hasTouch) return;
@@ -380,16 +404,22 @@ function AuraDial() {
     let rafId = null;
 
     const handleMouseMove = (e) => {
-      if (!isOpenRef.current || !hubRef.current) return;
+      if (!isOpenRef.current) return;
       if (rafId) return; // Skip if already queued — throttle to 1 per frame
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        if (!isOpenRef.current || !hubRef.current) return;
-        const rect = hubRef.current.getBoundingClientRect();
-        const hubCx = rect.left + rect.width / 2;
-        const hubCy = rect.top + rect.height / 2;
-        const dx = e.clientX - hubCx;
-        const dy = e.clientY - hubCy;
+        if (!isOpenRef.current) return;
+        
+        let center = hubCenterRef.current;
+        if (!center && hubRef.current) {
+          const rect = hubRef.current.getBoundingClientRect();
+          center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+          hubCenterRef.current = center;
+        }
+        if (!center) return;
+
+        const dx = e.clientX - center.x;
+        const dy = e.clientY - center.y;
         if (Math.sqrt(dx * dx + dy * dy) > orbitRadius) {
           setIsOpen(false);
         }

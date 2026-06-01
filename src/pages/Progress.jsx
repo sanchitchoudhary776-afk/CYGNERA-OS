@@ -125,9 +125,21 @@ function PillBars({ data, total }) {
   const currentPath = solvePath(currPts);
   const ghostPath = solvePath(ghostPts);
 
+  const chartRectRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (chartRef.current) {
+      chartRectRef.current = chartRef.current.getBoundingClientRect();
+    }
+  };
+
   const handleMouseMove = (e) => {
-    if (!chartRef.current) return;
-    const rect = chartRef.current.getBoundingClientRect();
+    let rect = chartRectRef.current;
+    if (!rect && chartRef.current) {
+      rect = chartRef.current.getBoundingClientRect();
+      chartRectRef.current = rect;
+    }
+    if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const idx = Math.round((x / 100) * (data.length - 1));
     setHoverIdx(Math.max(0, Math.min(data.length - 1, idx)));
@@ -137,8 +149,9 @@ function PillBars({ data, total }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
       <div
         ref={chartRef}
+        onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIdx(null)}
+        onMouseLeave={() => { setHoverIdx(null); chartRectRef.current = null; }}
         style={{ position: 'relative', height: 210, width: '100%', marginTop: 10, background: isDark ? '#0B0E14' : 'linear-gradient(180deg, #f8faf8 0%, #f0f4f0 100%)', borderRadius: 24, overflow: 'hidden', cursor: 'crosshair', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'}`, boxShadow: isDark ? 'inset 0 0 80px rgba(0,0,0,0.9), 0 20px 50px rgba(0,0,0,0.5)' : 'inset 0 0 40px rgba(0,0,0,0.03), 0 4px 20px rgba(0,0,0,0.06)' }}
       >
         {/* Technical Dotted Grid */}
