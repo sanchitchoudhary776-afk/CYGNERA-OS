@@ -97,6 +97,7 @@ export default function Settings() {
   const { theme } = useTheme();
   const { askConfirm } = usePremium();
   const aiOn = true;
+  const isDesktop = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
   const { settings: shieldSettings, updateSettings, addBlockedSite, removeBlockedSite, addBlockedApp, removeBlockedApp } = useFocusShield();
   const [newSite, setNewSite] = useState('');
@@ -749,7 +750,8 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Blocked Applications */}
+                {/* Blocked Applications — Desktop (localhost) Only */}
+                {isDesktop ? (
                 <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -835,6 +837,47 @@ export default function Settings() {
                     )}
                   </div>
                 </div>
+                ) : (
+                /* Mobile / Tablet Info Banner */
+                <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{
+                    padding: '14px 16px',
+                    borderRadius: 'var(--r-md)',
+                    background: 'rgba(96,165,250,0.06)',
+                    border: '1px solid rgba(96,165,250,0.15)',
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start'
+                  }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#60a5fa' }}>smartphone</span>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--t1)', marginBottom: 4 }}>Mobile Shield Active</p>
+                      <p style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5 }}>
+                        On mobile &amp; tablet, Focus Shield monitors tab switches, plays an alarm on breach, and keeps your screen awake during sessions. Deep App Blocker requires the desktop dev server.
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                        {[
+                          { icon: 'visibility', label: 'Tab Monitor' },
+                          { icon: 'volume_up', label: 'Breach Alarm' },
+                          { icon: 'screen_lock_portrait', label: 'Wake Lock' },
+                          { icon: 'block', label: 'Site Blocklist' },
+                        ].map(f => (
+                          <span key={f.label} style={{
+                            fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 99,
+                            background: 'rgba(9,205,131,0.08)', color: 'var(--p)', border: '1px solid rgba(9,205,131,0.15)',
+                            display: 'inline-flex', alignItems: 'center', gap: 4
+                          }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{f.icon}</span>
+                            {f.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                )}
               </div>
             )}
           </Section>

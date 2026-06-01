@@ -40,6 +40,80 @@ export function FocusShieldProvider({ children }) {
   const [sessionViolations, setSessionViolations] = useState([]);
   const lastHiddenAt = useRef(null);
 
+  const audioCtxRef = useRef(null);
+  const alarmIntervalRef = useRef(null);
+  const wakeLockRef = useRef(null);
+
+  const initAudio = useCallback(() => {
+    try {
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+    } catch (e) {
+      console.warn('[FocusShield] Web Audio API initialization failed:', e);
+    }
+  }, []);
+
+  const acquireWakeLock = useCallback(async () => {
+    try {
+      if ('wakeLock' in navigator && !wakeLockRef.current) {
+        wakeLockRef.current = await navigator.wakeLock.request('screen');
+      }
+    } catch (err) {
+      console.warn('[FocusShield] Screen Wake Lock request failed:', err);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release().then(() => {
+        wakeLockRef.current = null;
+      }).catch(() => {
+        wakeLockRef.current = null;
+      });
+    }
+  }, []);
+
+  const startAlarm = useCallback(() => {
+    if (alarmIntervalRef.current) return;
+    initAudio();
+    
+    alarmIntervalRef.current = setInterval(() => {
+      try {
+        const ctx = audioCtxRef.current;
+        if (!ctx || ctx.state === 'suspended') return;
+        
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(440, ctx.currentTime + 0.25);
+        
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.start();
+        osc.stop(ctx.currentTime + 0.45);
+      } catch (e) {
+        console.warn('[FocusShield] Sound playback failed:', e);
+      }
+    }, 600);
+  }, [initAudio]);
+
+  const stopAlarm = useCallback(() => {
+    if (alarmIntervalRef.current) {
+      clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+  }, []);
+
   // Persist settings
   useEffect(() => { saveSettings(settings); }, [settings]);
 
@@ -133,19 +207,27 @@ export function FocusShieldProvider({ children }) {
     setSessionViolations([]);
     setShowShield(false);
     lastHiddenAt.current = null;
-  }, [settings.enabled]);
+    initAudio();
+    acquireWakeLock();
+  }, [settings.enabled, initAudio, acquireWakeLock]);
 
   const deactivateShield = useCallback(() => {
     setIsActive(false);
     setShowShield(false);
     lastHiddenAt.current = null;
+    stopAlarm();
+    releaseWakeLock();
     // Exit fullscreen if we entered it
     if (document.fullscreenElement) {
       try { document.exitFullscreen?.(); } catch {}
     }
-  }, []);
+  }, [stopAlarm, releaseWakeLock]);
 
   const syncWithBackend = useCallback(async (enabled, apps, sites) => {
+    // Backend blocker API only exists on localhost dev server (Vite plugin).
+    // Skip on deployed environments (Vercel, etc.) to avoid 404 noise.
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (!isLocal) return;
     try {
       await fetch('/api/blocker', {
         method: 'POST',
@@ -164,7 +246,36 @@ export function FocusShieldProvider({ children }) {
 
   const dismissShield = useCallback(() => {
     setShowShield(false);
-  }, []);
+    stopAlarm();
+  }, [stopAlarm]);
+
+  // Sync wake lock when tab returns to visibility
+  useEffect(() => {
+    const handleVisibilityCheck = () => {
+      if (isActive && !document.hidden) {
+        acquireWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityCheck);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityCheck);
+  }, [isActive, acquireWakeLock]);
+
+  // Handle playing and stopping alarm
+  useEffect(() => {
+    if (isActive && showShield) {
+      startAlarm();
+    } else {
+      stopAlarm();
+    }
+  }, [isActive, showShield, startAlarm, stopAlarm]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAlarm();
+      releaseWakeLock();
+    };
+  }, [stopAlarm, releaseWakeLock]);
 
   const updateSettings = useCallback((updates) => {
     setSettings(prev => ({ ...prev, ...updates }));

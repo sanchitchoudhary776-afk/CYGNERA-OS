@@ -1,11 +1,19 @@
 import { useFocusShield } from '@context/FocusShieldContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect } from 'react';
 
 export default function FocusShield() {
   const { showShield, showFullscreenPrompt, reEnterFullscreen, violations, sessionViolations, dismissShield, isActive, settings } = useFocusShield();
 
   const lastViolation = sessionViolations[sessionViolations.length - 1];
   const awaySeconds = lastViolation?.duration || 0;
+
+  // Haptic vibration on breach for mobile/tablet
+  useEffect(() => {
+    if (isActive && showShield && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200, 100, 300]);
+    }
+  }, [isActive, showShield]);
 
   return (
     <>
@@ -26,8 +34,10 @@ export default function FocusShield() {
               alignItems: 'center',
               justifyContent: 'center',
               background: 'rgba(0, 0, 0, 0.96)',
-              backdropFilter: 'blur(30px)',
-              WebkitBackdropFilter: 'blur(30px)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              padding: '20px',
+              overflowY: 'auto',
             }}
           >
             {/* Pulsing border */}
@@ -45,12 +55,12 @@ export default function FocusShield() {
               style={{
                 width: '100%',
                 maxWidth: 420,
-                padding: '52px 40px',
+                padding: 'clamp(28px, 5vw, 52px) clamp(20px, 4vw, 40px)',
                 textAlign: 'center',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 22,
+                gap: 'clamp(14px, 3vw, 22px)',
               }}
             >
               {/* Lock Icon */}
@@ -58,8 +68,8 @@ export default function FocusShield() {
                 animate={{ scale: [1, 1.12, 1] }}
                 transition={{ duration: 2.5, repeat: Infinity }}
                 style={{
-                  width: 80,
-                  height: 80,
+                  width: 'clamp(60px, 12vw, 80px)',
+                  height: 'clamp(60px, 12vw, 80px)',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(59,130,246,0.06))',
                   border: '2px solid rgba(96,165,250,0.35)',
@@ -70,7 +80,7 @@ export default function FocusShield() {
                 }}
               >
                 <span className="material-symbols-outlined" style={{
-                  fontSize: 38,
+                  fontSize: 'clamp(28px, 6vw, 38px)',
                   color: '#60a5fa',
                   fontVariationSettings: "'FILL' 1",
                 }}>lock</span>
@@ -79,7 +89,7 @@ export default function FocusShield() {
               {/* Title */}
               <div>
                 <h2 style={{
-                  fontSize: 24,
+                  fontSize: 'clamp(18px, 4vw, 24px)',
                   fontWeight: 900,
                   color: '#60a5fa',
                   letterSpacing: '-0.03em',
@@ -87,7 +97,7 @@ export default function FocusShield() {
                   lineHeight: 1.2,
                 }}>Fullscreen Lock Active</h2>
                 <p style={{
-                  fontSize: 14,
+                  fontSize: 'clamp(12px, 2.5vw, 14px)',
                   color: 'rgba(255,255,255,0.45)',
                   marginTop: 10,
                   lineHeight: 1.6,
@@ -108,16 +118,18 @@ export default function FocusShield() {
                   justifyContent: 'center',
                   gap: 10,
                   width: '100%',
-                  padding: '16px 32px',
+                  padding: 'clamp(14px, 3vw, 16px) 32px',
                   borderRadius: 14,
                   border: 'none',
                   background: 'linear-gradient(135deg, rgba(96,165,250,0.25), rgba(59,130,246,0.12))',
                   color: '#60a5fa',
-                  fontSize: 16,
+                  fontSize: 'clamp(14px, 2.8vw, 16px)',
                   fontWeight: 800,
                   cursor: 'pointer',
                   boxShadow: '0 8px 28px rgba(96,165,250,0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
                   letterSpacing: '0.02em',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: 48,
                 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>fullscreen</span>
@@ -160,8 +172,11 @@ export default function FocusShield() {
               alignItems: 'center',
               justifyContent: 'center',
               background: 'rgba(0, 0, 0, 0.92)',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              padding: '16px',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {/* Animated red border pulse */}
@@ -179,12 +194,12 @@ export default function FocusShield() {
               style={{
                 width: '100%',
                 maxWidth: 480,
-                padding: '48px 40px',
+                padding: 'clamp(24px, 5vw, 48px) clamp(20px, 4vw, 40px)',
                 textAlign: 'center',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 24,
+                gap: 'clamp(16px, 3vw, 24px)',
               }}
             >
               {/* Shield Icon */}
@@ -192,8 +207,8 @@ export default function FocusShield() {
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 style={{
-                  width: 88,
-                  height: 88,
+                  width: 'clamp(64px, 14vw, 88px)',
+                  height: 'clamp(64px, 14vw, 88px)',
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,60,60,0.05))',
                   border: '2px solid rgba(255,107,107,0.3)',
@@ -204,7 +219,7 @@ export default function FocusShield() {
                 }}
               >
                 <span className="material-symbols-outlined" style={{
-                  fontSize: 42,
+                  fontSize: 'clamp(30px, 7vw, 42px)',
                   color: '#ff6b6b',
                   fontVariationSettings: "'FILL' 1",
                 }}>shield</span>
@@ -213,7 +228,7 @@ export default function FocusShield() {
               {/* Title */}
               <div>
                 <h2 style={{
-                  fontSize: 28,
+                  fontSize: 'clamp(20px, 4.5vw, 28px)',
                   fontWeight: 900,
                   color: '#ff6b6b',
                   letterSpacing: '-0.03em',
@@ -221,7 +236,7 @@ export default function FocusShield() {
                   lineHeight: 1.2,
                 }}>Focus Breach Detected</h2>
                 <p style={{
-                  fontSize: 15,
+                  fontSize: 'clamp(12px, 2.5vw, 15px)',
                   color: 'rgba(255,255,255,0.5)',
                   marginTop: 10,
                   lineHeight: 1.6,
@@ -234,19 +249,19 @@ export default function FocusShield() {
               {/* Violation Counter */}
               <div style={{
                 display: 'flex',
-                gap: 24,
-                padding: '18px 32px',
+                gap: 'clamp(16px, 3vw, 24px)',
+                padding: 'clamp(12px, 2vw, 18px) clamp(20px, 4vw, 32px)',
                 borderRadius: 16,
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}>
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 28, fontWeight: 900, color: '#ff6b6b', lineHeight: 1 }}>{violations}</p>
+                  <p style={{ fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 900, color: '#ff6b6b', lineHeight: 1 }}>{violations}</p>
                   <p style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>Violations</p>
                 </div>
                 <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
                 <div style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 28, fontWeight: 900, color: '#fb923c', lineHeight: 1 }}>{awaySeconds}s</p>
+                  <p style={{ fontSize: 'clamp(22px, 5vw, 28px)', fontWeight: 900, color: '#fb923c', lineHeight: 1 }}>{awaySeconds}s</p>
                   <p style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>Away Time</p>
                 </div>
               </div>
@@ -254,7 +269,7 @@ export default function FocusShield() {
               {/* Blocked Sites Reminder */}
               {settings.blockedSites.length > 0 && (
                 <div style={{
-                  padding: '14px 20px',
+                  padding: 'clamp(10px, 2vw, 14px) clamp(14px, 3vw, 20px)',
                   borderRadius: 12,
                   background: 'rgba(255,107,107,0.05)',
                   border: '1px solid rgba(255,107,107,0.12)',
@@ -291,16 +306,18 @@ export default function FocusShield() {
                   justifyContent: 'center',
                   gap: 10,
                   width: '100%',
-                  padding: '16px 32px',
+                  padding: 'clamp(14px, 3vw, 16px) 32px',
                   borderRadius: 14,
                   border: 'none',
                   background: 'linear-gradient(135deg, rgba(9,205,131,0.2), rgba(6,182,212,0.1))',
                   color: 'var(--p)',
-                  fontSize: 16,
+                  fontSize: 'clamp(14px, 2.8vw, 16px)',
                   fontWeight: 800,
                   cursor: 'pointer',
                   boxShadow: '0 8px 24px rgba(9,205,131,0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
                   letterSpacing: '0.02em',
+                  WebkitTapHighlightColor: 'transparent',
+                  minHeight: 48,
                 }}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1" }}>arrow_back</span>
@@ -309,7 +326,7 @@ export default function FocusShield() {
 
               {/* Motivational footer */}
               <p style={{
-                fontSize: 12,
+                fontSize: 'clamp(10px, 2vw, 12px)',
                 color: 'rgba(255,255,255,0.2)',
                 fontStyle: 'italic',
                 marginTop: 4,
