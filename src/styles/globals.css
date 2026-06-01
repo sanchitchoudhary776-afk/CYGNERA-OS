@@ -445,7 +445,8 @@ nav,
   margin: 0;
   padding: 0;
   border: 0 solid transparent;
-  /* Tailwind-like border reset */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 html {
