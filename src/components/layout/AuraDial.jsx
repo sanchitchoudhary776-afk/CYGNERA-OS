@@ -364,7 +364,7 @@ function AuraDial() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const { isMobile, isDesktop } = breakpoints;
+  const { isMobile, isTablet, isDesktop } = breakpoints;
   const iconSize = isDesktop ? 52 : 48;
   const hubSize = isDesktop ? 68 : 56;
 
@@ -438,7 +438,7 @@ function AuraDial() {
         style={{
           position: 'fixed',
           left: '50%',
-          bottom: (isMobile || hasTouch) ? 40 : 60,
+          bottom: isMobile ? 40 : (isTablet || hasTouch) ? 70 : 60,
           transform: `translateX(-50%) translateY(${(isMobile && isOpen) ? -window.innerHeight * 0.4 : 0}px)`,
           zIndex: 99,
           display: 'flex',
