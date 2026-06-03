@@ -885,18 +885,17 @@ export default function FocusTimer() {
   );
 }
 
-// ── Scenery themes for Defocus / Zen Mode ──────────────────────────
 const ZEN_SCENES = [
   { id: 'none', label: 'None', icon: 'block', url: '' },
-  { id: 'cosmos', label: 'Cosmos', icon: 'globe', url: 'https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'nebula', label: 'Nebula', icon: 'blur_on', url: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'aurora', label: 'Aurora', icon: 'flare', url: 'https://images.unsplash.com/photo-1579033461380-adb47c3eb938?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'mountains', label: 'Mountains', icon: 'landscape', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'sunset', label: 'Sunset', icon: 'wb_twilight', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'rain', label: 'Rain', icon: 'rainy', url: 'https://images.unsplash.com/photo-1515621061946-eff1c2a352bd?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'forest', label: 'Forest', icon: 'forest', url: 'https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'ocean', label: 'Ocean', icon: 'waves', url: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?auto=format&fit=crop&w=1920&q=80' },
-  { id: 'cozy', label: 'Cozy', icon: 'fireplace', url: 'https://images.unsplash.com/photo-1574482620826-40685ca5ebd2?auto=format&fit=crop&w=1920&q=80' }
+  { id: 'cosmos', label: 'Cosmos', icon: 'globe', url: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'nebula', label: 'Nebula', icon: 'blur_on', url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'aurora', label: 'Aurora', icon: 'flare', url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'mountains', label: 'Mountains', icon: 'landscape', url: 'https://images.unsplash.com/photo-1486873249359-2731bd6da57b?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'sunset', label: 'Sunset', icon: 'wb_twilight', url: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'rain', label: 'Rain', icon: 'rainy', url: 'https://images.unsplash.com/photo-1438449805896-28a666819a20?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'forest', label: 'Forest', icon: 'forest', url: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'ocean', label: 'Ocean', icon: 'waves', url: 'https://images.unsplash.com/photo-1439066615861-d1af74d74000?auto=format&fit=crop&w=1920&q=85' },
+  { id: 'cozy', label: 'Cozy', icon: 'fireplace', url: 'https://images.unsplash.com/photo-1517799094725-e3457b9efa8d?auto=format&fit=crop&w=1920&q=85' }
 ];
 
 // ── Zen Mode Distraction-Free Fullscreen Overlay ──────────────────────────
