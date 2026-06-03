@@ -886,16 +886,16 @@ export default function FocusTimer() {
 }
 
 const ZEN_SCENES = [
-  { id: 'none', label: 'None', icon: 'block', url: '' },
-  { id: 'cosmos', label: 'Cosmos', icon: 'globe', url: 'https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'nebula', label: 'Nebula', icon: 'blur_on', url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'aurora', label: 'Aurora', icon: 'flare', url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'mountains', label: 'Mountains', icon: 'landscape', url: 'https://images.unsplash.com/photo-1486873249359-2731bd6da57b?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'sunset', label: 'Sunset', icon: 'wb_twilight', url: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'rain', label: 'Rain', icon: 'rainy', url: 'https://images.unsplash.com/photo-1438449805896-28a666819a20?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'forest', label: 'Forest', icon: 'forest', url: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'ocean', label: 'Ocean', icon: 'waves', url: 'https://images.unsplash.com/photo-1439066615861-d1af74d74000?auto=format&fit=crop&w=1920&q=85' },
-  { id: 'cozy', label: 'Cozy', icon: 'fireplace', url: 'https://images.unsplash.com/photo-1517799094725-e3457b9efa8d?auto=format&fit=crop&w=1920&q=85' }
+  { id: 'none', label: 'None', icon: 'block', url: '', glow: 'rgba(10,211,135,0.06)' },
+  { id: 'cosmos', label: 'Cosmos', icon: 'globe', url: 'https://images.unsplash.com/photo-1538370965046-79c0d6907d47?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(139,92,246,0.22)' },
+  { id: 'nebula', label: 'Nebula', icon: 'blur_on', url: 'https://images.unsplash.com/photo-1502134249126-9f3755a50d78?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(236,72,153,0.22)' },
+  { id: 'aurora', label: 'Aurora', icon: 'flare', url: 'https://images.unsplash.com/photo-1579033461380-adb47c3eb938?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(20,184,166,0.22)' },
+  { id: 'mountains', label: 'Mountains', icon: 'landscape', url: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(59,130,246,0.22)' },
+  { id: 'sunset', label: 'Sunset', icon: 'wb_twilight', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(249,115,22,0.22)' },
+  { id: 'rain', label: 'Rain', icon: 'rainy', url: 'https://images.unsplash.com/photo-1486016006115-74a41448aea2?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(59,130,246,0.22)' },
+  { id: 'forest', label: 'Forest', icon: 'forest', url: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(34,197,94,0.22)' },
+  { id: 'ocean', label: 'Ocean', icon: 'waves', url: 'https://images.unsplash.com/photo-1518156677180-95a2893f3e9f?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(14,165,233,0.22)' },
+  { id: 'cozy', label: 'Cozy', icon: 'fireplace', url: 'https://images.unsplash.com/photo-1545048702-79362596cdc9?auto=format&fit=crop&w=1920&q=85', glow: 'rgba(239,68,68,0.22)' }
 ];
 
 // ── Zen Mode Distraction-Free Fullscreen Overlay ──────────────────────────
@@ -995,16 +995,18 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
       {activeScene.url && (
         <>
           <div style={{
-            position: 'absolute', inset: 0, zIndex: 0,
+            position: 'absolute', inset: -20, zIndex: 0,
             backgroundImage: `url(${activeScene.url})`,
             backgroundSize: 'cover', backgroundPosition: 'center',
-            opacity: running ? 0.6 : 0.75,
+            filter: 'contrast(1.15) brightness(0.7) saturate(1.2)',
+            opacity: running ? 0.78 : 0.9,
             transition: 'opacity 1.2s ease',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            animation: 'kenBurns 45s ease-in-out infinite alternate'
           }} />
           <div style={{
             position: 'absolute', inset: 0, zIndex: 0,
-            background: 'linear-gradient(180deg, rgba(4,7,18,0.25) 0%, rgba(4,7,18,0.55) 100%)',
+            background: 'radial-gradient(circle at center, rgba(3,5,8,0.2) 0%, rgba(3,5,8,0.92) 100%)',
             pointerEvents: 'none'
           }} />
         </>
@@ -1016,13 +1018,13 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '80vw',
-        height: '80vw',
-        maxWidth: 800,
-        maxHeight: 800,
+        width: '85vw',
+        height: '85vw',
+        maxWidth: 900,
+        maxHeight: 900,
         borderRadius: '50%',
         background: running
-          ? 'radial-gradient(circle, rgba(9,205,131,0.08) 0%, rgba(6,182,212,0.03) 40%, transparent 70%)'
+          ? `radial-gradient(circle, ${activeScene.glow || 'rgba(10,211,135,0.06)'} 0%, transparent 70%)`
           : 'radial-gradient(circle, rgba(239,68,68,0.04) 0%, transparent 70%)',
         pointerEvents: 'none',
         zIndex: 0,
@@ -1355,8 +1357,13 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
 
       <style>{`
         @keyframes breathingGlow {
-          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.08; filter: blur(40px); }
-          50% { transform: translate(-50%, -50%) scale(1.18); opacity: 0.16; filter: blur(60px); }
+          0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.1; filter: blur(40px); }
+          50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.22; filter: blur(60px); }
+        }
+        @keyframes kenBurns {
+          0% { transform: scale(1.02) translate(0, 0); }
+          50% { transform: scale(1.1) translate(-1.5%, 1%); }
+          100% { transform: scale(1.04) translate(1.5%, -1%); }
         }
         @keyframes pulse {
           0%, 100% { opacity: 0.4; }
