@@ -12,7 +12,7 @@ import OfflineBanner from '@components/ui/OfflineBanner';
 import FocusShield from '@components/ui/FocusShield';
 
 // Pages
-import Landing       from '@pages/Landing';
+
 import Login         from '@pages/auth/Login';
 import Signup        from '@pages/auth/Signup';
 import Dashboard     from '@pages/Dashboard';
@@ -55,14 +55,14 @@ function GuestRoute({ children }) {
 function RootRedirect() {
   const loc = useLocation();
   const { isAuth } = useAuth();
-  return <Navigate to={isAuth ? `/dashboard${loc.hash || ''}` : '/landing'} replace={true} />;
+  return <Navigate to={isAuth ? `/dashboard${loc.hash || ''}` : '/signup'} replace={true} />;
 }
 
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<RootRedirect/>}/>
-      <Route path="/landing" element={<Landing/>}/>
+
       <Route path="/login"  element={<GuestRoute><Login/></GuestRoute>}/>
       <Route path="/signup" element={<GuestRoute><Signup/></GuestRoute>}/>
       <Route path="/*" element={
