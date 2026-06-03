@@ -35,20 +35,22 @@ export default function Login() {
 
   const submit = async e => {
     e.preventDefault();
-    if (!username.trim() || !password) { toast.error('Please enter your username and password'); return; }
+    if (!username.trim() || !password) { toast.error('Please enter your username/email and password'); return; }
     
-    // Alphanumeric username validation
-    const cleanUsername = username.trim().toLowerCase();
-    if (cleanUsername.includes('@')) {
-      toast.error('Please sign in using your username, not an email.');
-      return;
-    }
-    if (cleanUsername.length < 3) {
-      toast.error('Username must be at least 3 characters.');
-      return;
+    const cleanInput = username.trim().toLowerCase();
+    if (cleanInput.includes('@')) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanInput)) {
+        toast.error('Please enter a valid email address.');
+        return;
+      }
+    } else {
+      if (cleanInput.length < 3) {
+        toast.error('Username must be at least 3 characters.');
+        return;
+      }
     }
 
-    const r = await login(cleanUsername, password);
+    const r = await login(cleanInput, password);
     if (r.success) {
       toast.success('Welcome back! 👋');
       navigate(from, { replace: true });
@@ -261,12 +263,12 @@ export default function Login() {
           <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Username */}
             <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--t2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Username</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--t2)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Username or Email</label>
               <div style={{ position: 'relative' }}>
                 <span className="material-symbols-outlined" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, color: focus === 'username' ? 'var(--p)' : 'var(--t4)', pointerEvents: 'none', transition: 'color 200ms' }}>person</span>
                 <input className="input" type="text" value={username} onChange={e => setUsername(e.target.value)}
                   onFocus={() => setFocus('username')} onBlur={() => setFocus('')}
-                  placeholder="e.g. aditya_kumar" required
+                  placeholder="e.g. aditya_kumar or email@domain.com" required
                   style={{ paddingLeft: 44, padding: '12px 16px 12px 44', borderRadius: 'var(--r-md)', border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', color: 'var(--t1)', fontSize: 14, fontWeight: 500, transition: 'all 200ms ease', width: '100%', boxSizing: 'border-box' }}
                   onMouseEnter={e => { if (focus !== 'username') { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; } }}
                   onMouseLeave={e => { if (focus !== 'username') { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; } }} />

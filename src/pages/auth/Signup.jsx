@@ -66,19 +66,22 @@ export default function Signup() {
     e.preventDefault();
     if (!name.trim()) { toast.error('Please enter your name'); return; }
     
-    // Alphanumeric + underscore validation for username
-    const cleanUsername = username.trim().toLowerCase();
-    if (cleanUsername.includes('@')) {
-      toast.error('Do not enter an email address. Choose a secure username instead.');
-      return;
-    }
-    if (cleanUsername.length < 3) {
-      toast.error('Username must be at least 3 characters.');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_]+$/.test(cleanUsername)) {
-      toast.error('Username can only contain letters, numbers, and underscores.');
-      return;
+    const cleanInput = username.trim().toLowerCase();
+    const isEmail = cleanInput.includes('@');
+    if (isEmail) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanInput)) {
+        toast.error('Please enter a valid email address.');
+        return;
+      }
+    } else {
+      if (cleanInput.length < 3) {
+        toast.error('Username must be at least 3 characters.');
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(cleanInput)) {
+        toast.error('Username can only contain letters, numbers, and underscores.');
+        return;
+      }
     }
 
     if (password.length < 6) { toast.error('Password needs at least 6 characters'); return; }
@@ -88,11 +91,16 @@ export default function Signup() {
 
   const submit = async () => {
     if (!style) { toast.error('Pick your learning style'); return; }
-    const cleanUsername = username.trim().toLowerCase();
-    const r = await signup({ name: name.trim(), usernameOrEmail: cleanUsername, password, subjects, learningStyle: style });
+    const cleanInput = username.trim().toLowerCase();
+    const r = await signup({ name: name.trim(), usernameOrEmail: cleanInput, password, subjects, learningStyle: style });
     if (r.success) {
-      toast.success('Welcome to AXINITE OS! 🚀');
-      navigate('/dashboard', { replace: true });
+      if (r.needsConfirmation) {
+        toast.success('Verification email sent! ✉️ Please check your inbox.', { duration: 8000 });
+        navigate('/login', { replace: true });
+      } else {
+        toast.success('Welcome to AXINITE OS! 🚀');
+        navigate('/dashboard', { replace: true });
+      }
     } else {
       toast.error(r.error || 'Signup failed');
     }
@@ -231,10 +239,10 @@ export default function Signup() {
 
                 {/* Username */}
                 <div>
-                  <label className="label">Choose Username</label>
+                  <label className="label">Username or Email</label>
                   <div style={{ position: 'relative' }}>
                     <span className="material-symbols-outlined" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 17, color: focus === 'username' ? 'var(--p)' : 'var(--t4)', pointerEvents: 'none', transition: 'color 180ms' }}>alternate_email</span>
-                    <input className="input" type="text" value={username} onChange={e => setUsername(e.target.value)} onFocus={() => setFocus('username')} onBlur={() => setFocus('')} placeholder="e.g. aditya_kumar" required style={{ paddingLeft: 40 }} />
+                    <input className="input" type="text" value={username} onChange={e => setUsername(e.target.value)} onFocus={() => setFocus('username')} onBlur={() => setFocus('')} placeholder="e.g. aditya_kumar or email@domain.com" required style={{ paddingLeft: 40 }} />
                   </div>
                 </div>
 
