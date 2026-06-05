@@ -512,7 +512,7 @@ const AURA_TOOLS_GROQ = [
     type: "function",
     function: {
       name: "schedule_session",
-      description: "Schedule a study session for a specific subject and topic.",
+      description: "Schedule a study session for a specific subject and topic. NEVER call this function if the user hasn't explicitly specified the start time (startTime) and duration. If these details are missing, you must ask the user for them.",
       parameters: {
         type: "object",
         properties: {
@@ -654,6 +654,7 @@ ${contextBlock}
 ── CRITICAL ──
 - NEVER call any tool (navigate_to, schedule_session, etc.) for casual greetings like "hi", "hello", "hey", "what's up", or general conversation. Just reply naturally with text.
 - Only use tools when the user explicitly requests an action (e.g., "take me to tasks", "schedule a session", "add a task").
+- For schedule_session: NEVER call this tool if the user has not specified the start time (e.g. "at 3 PM") and duration (e.g. "for 1 hour"). If they say "I want to study physics" or "schedule physics", you MUST reply asking them for the specific start time and duration they prefer. Do not assume or hallucinate these values.
 
 ── RESPONSE RULES ──
 - For quick actions (scheduling, navigation, confirmations): keep it to 1 short sentence.
