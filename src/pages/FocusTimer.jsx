@@ -903,8 +903,8 @@ const ZEN_SCENES = [
   { id: 'ocean',     label: 'Ocean',      icon: 'waves',           url: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=3840&q=90' },
   // Warm ambient fireplace glow with soft blankets — ultimate cozy hygge vibes
   { id: 'cozy',      label: 'Cozy',       icon: 'fireplace',       url: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=3840&q=90' },
-  // Fiery lava eruption — glowing red-orange rivers of molten rock cutting through dark volcanic terrain
-  { id: 'volcano',   label: 'Volcano',    icon: 'local_fire_department', url: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=3840&q=90' },
+  // Breathtaking forest waterfall cascading down rocky cliffs — ultimate nature serenity
+  { id: 'waterfall', label: 'Waterfall',  icon: 'water',           url: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=3840&q=90' },
   // Japanese sakura cherry blossoms in full bloom — soft pink petals over a tranquil path
   { id: 'sakura',    label: 'Sakura',     icon: 'spa',             url: 'https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=3840&q=90' }
 ];
