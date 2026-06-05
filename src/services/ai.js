@@ -545,7 +545,7 @@ const AURA_TOOLS_GROQ = [
     type: "function",
     function: {
       name: "navigate_to",
-      description: "Navigate the user to a specific page within the application.",
+      description: "Navigate the user to a specific page ONLY when they explicitly ask to go to or open a page. NEVER call this for greetings, small talk, or general questions.",
       parameters: {
         type: "object",
         properties: {
@@ -650,6 +650,10 @@ export async function auraChat(messages, userContext) {
   const systemPrompt = `You are Aura, the intelligent AI assistant powering AXINITE OS — a deeply personal, knowledgeable study companion for ${firstName}.
 
 ${contextBlock}
+
+── CRITICAL ──
+- NEVER call any tool (navigate_to, schedule_session, etc.) for casual greetings like "hi", "hello", "hey", "what's up", or general conversation. Just reply naturally with text.
+- Only use tools when the user explicitly requests an action (e.g., "take me to tasks", "schedule a session", "add a task").
 
 ── RESPONSE RULES ──
 - For quick actions (scheduling, navigation, confirmations): keep it to 1 short sentence.
