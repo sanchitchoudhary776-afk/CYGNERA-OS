@@ -635,27 +635,44 @@ export async function auraChat(messages, userContext) {
   const firstName = userContext.name?.split(' ')[0] || 'Student';
   const profileCtx = PersonalizationEngine.generateWeeklyDigestPrompt(userContext.appState || {});
 
-  const systemPrompt = `You are Aura, the intelligent heart of AXINITE OS — a deeply personal, realistic companion for ${firstName}.
+  // Build rich context: pending tasks + today's schedule
+  const pendingTasks = (userContext.tasks || []).slice(0, 8);
+  const todaySchedule = (userContext.schedule || []).filter(s => s.day === new Date().toISOString().slice(0, 10)).slice(0, 6);
 
-  CORE RULES:
-  - Keep answers extremely humanistic, clear-cut, and ultra-short.
-  - Avoid paragraphs or filler information entirely.
-  - Limit every response to exactly 1 short sentence (maximum 10-15 words).
-  - Use casual, natural, premium companion-like styling (no markdown).
-  - If asked to recalibrate mood or feelings, tell them you are taking them to calibrate, and call navigate_to with page="/checkin".
-  - If scheduling a session and no time is specified, ask "At what time do you want to study?" in a simple 5-word sentence.
-  - When confirming a tool call, keep it under 8 words (e.g., "Done, scheduled physics for you." or "I've started your timer, let's go.").`;
+  const contextBlock = [
+    profileCtx ? `\n── STUDENT PROFILE ──\n${profileCtx}` : '',
+    `\n── CURRENT STATE ──\nMood: ${mood.level}/5 (${mood.label})`,
+    pendingTasks.length ? `Pending tasks (${pendingTasks.length}): ${pendingTasks.join(', ')}` : 'No pending tasks.',
+    todaySchedule.length ? `Today's schedule: ${todaySchedule.map(s => `${s.startTime} ${s.subject} — ${s.topic || 'study'} (${s.durationMinutes || 30}min)`).join('; ')}` : 'No sessions scheduled today.',
+    `Subjects: ${Object.keys(userContext.progress || {}).join(', ') || 'None tracked yet'}`,
+  ].filter(Boolean).join('\n');
+
+  const systemPrompt = `You are Aura, the intelligent AI assistant powering AXINITE OS — a deeply personal, knowledgeable study companion for ${firstName}.
+
+${contextBlock}
+
+── RESPONSE RULES ──
+- For quick actions (scheduling, navigation, confirmations): keep it to 1 short sentence.
+- For study questions, explanations, homework help, or advice: give a clear, thorough answer (2-5 sentences). Use bullet points if it helps clarity.
+- You can use simple markdown (bold, bullets) for structured answers. Avoid headers or code blocks.
+- Always be warm, supportive, and genuinely helpful. Sound like a smart friend, not a robot.
+- Reference ${firstName}'s actual tasks, schedule, mood, and progress when relevant.
+- If asked to recalibrate mood or feelings, tell them you're taking them to calibrate, and call navigate_to with page="/checkin".
+- If scheduling a session and no time is specified, ask what time they'd like.
+- You can help with homework, explain concepts, quiz the student, give study tips, and motivate them.
+- When confirming a tool action, keep it brief and friendly (e.g., "Done, scheduled physics for you!" or "Timer started, let's crush it!").`;
 
   try {
     const groqRes = await callWithRetry({
-      model: MODELS.fast,
+      model: MODELS.deep,
       messages: [
         { role: 'system', content: systemPrompt },
         ...messages.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.content }))
       ],
       tools: AURA_TOOLS_GROQ,
       tool_choice: "auto",
-      temperature: 0.7
+      temperature: 0.7,
+      max_tokens: 600
     });
 
     if (!groqRes) {

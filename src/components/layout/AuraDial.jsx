@@ -196,6 +196,7 @@ function AuraDial() {
       const res = await auraChat(newHistory, {
         name: user?.name || 'Student',
         tasks: pending,
+        schedule: schedule || [],
         progress: progress?.subjects || {},
         appState: { user, tasks, progress }
       });
@@ -622,11 +623,18 @@ function AuraDial() {
                     color: m.role === 'user' ? '#000' : 'var(--t2)',
                     fontSize: 13.5,
                     fontWeight: 500,
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
                     border: m.role === 'user' ? 'none' : '1px solid rgba(255,255,255,0.03)',
                     boxShadow: m.role === 'user' ? '0 4px 12px rgba(9,205,131,0.2)' : 'none'
                   }}>
-                    {m.content}
+                    {m.role === 'user' ? m.content : (
+                      <span dangerouslySetInnerHTML={{ __html: (m.content || '')
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/^[-•]\s+(.+)$/gm, '<span style="display:block;padding-left:12px;text-indent:-10px">• $1</span>')
+                        .replace(/\n/g, '<br/>')
+                      }} />
+                    )}
                   </div>
                 </div>
               ))}
