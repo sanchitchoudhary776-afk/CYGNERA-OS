@@ -889,10 +889,6 @@ export default function FocusTimer() {
 // Hand-curated, ultra-premium 4K sceneries — the most breathtaking imagery available
 const ZEN_SCENES = [
   { id: 'none',      label: 'None',      icon: 'block',           url: '' },
-  // Deep space — swirling galaxies & cosmic dust, by NASA/Unsplash (breathtaking spiral galaxy in deep space)
-  { id: 'cosmos',    label: 'Cosmos',     icon: 'globe',           url: 'https://images.unsplash.com/photo-1464802686167-b939a6910659?auto=format&fit=crop&w=3840&q=90' },
-  // Pillars of Creation style — vibrant interstellar cloud nebula, deep reds, teals & purples
-  { id: 'nebula',    label: 'Nebula',     icon: 'blur_on',         url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=3840&q=90' },
   // Vivid green aurora borealis dancing over a still lake with mountain reflections
   { id: 'aurora',    label: 'Aurora',     icon: 'flare',           url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=3840&q=90' },
   // Jagged alpine peaks at golden hour — dramatic shadows with snow-capped ridgelines
