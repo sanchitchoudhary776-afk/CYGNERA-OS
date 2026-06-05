@@ -895,16 +895,16 @@ const ZEN_SCENES = [
   { id: 'mountains', label: 'Mountains',  icon: 'landscape',       url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=3840&q=90' },
   // Cinematic ocean sunset — molten gold reflecting off calm tropical waters
   { id: 'sunset',    label: 'Sunset',     icon: 'wb_twilight',     url: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&w=3840&q=90' },
-  // Heavy rain on a window — glowing city bokeh lights shimmering through rain-streaked glass at night
-  { id: 'rain',      label: 'Rain',       icon: 'rainy',           url: 'https://images.unsplash.com/photo-1501691223387-dd0500403074?auto=format&fit=crop&w=3840&q=90' },
+  // Cinematic rainfall over a tropical landscape — silver sheets of rain sweeping across lush green hills
+  { id: 'rain',      label: 'Rain',       icon: 'rainy',           url: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?auto=format&fit=crop&w=3840&q=90' },
   // Ancient misty forest — towering redwoods with ethereal fog shafts of light
   { id: 'forest',    label: 'Forest',     icon: 'forest',          url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=3840&q=90' },
   // Crystal-clear turquoise ocean from above — Maldives-style aerial reef view
   { id: 'ocean',     label: 'Ocean',      icon: 'waves',           url: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=3840&q=90' },
   // Warm ambient fireplace glow with soft blankets — ultimate cozy hygge vibes
   { id: 'cozy',      label: 'Cozy',       icon: 'fireplace',       url: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=3840&q=90' },
-  // Spectacular molten lava rivers pouring into the ocean at night — raw volcanic power
-  { id: 'volcano',   label: 'Volcano',    icon: 'local_fire_department', url: 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?auto=format&fit=crop&w=3840&q=90' },
+  // Fiery lava eruption — glowing red-orange rivers of molten rock cutting through dark volcanic terrain
+  { id: 'volcano',   label: 'Volcano',    icon: 'local_fire_department', url: 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?auto=format&fit=crop&w=3840&q=90' },
   // Japanese sakura cherry blossoms in full bloom — soft pink petals over a tranquil path
   { id: 'sakura',    label: 'Sakura',     icon: 'spa',             url: 'https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=3840&q=90' }
 ];
