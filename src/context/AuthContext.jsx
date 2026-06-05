@@ -136,15 +136,25 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (usernameOrEmail, password) => {
     setLoading(true);
     
-    if (!supabase) {
-      setLoading(false);
-      return { success: false, error: 'Authentication service is not configured. Please contact support.' };
-    }
-
     let finalEmail = usernameOrEmail.trim().toLowerCase();
     const isUsername = !finalEmail.includes('@');
     if (isUsername) {
       finalEmail = `${finalEmail}@axinite.os`;
+    }
+
+    // Attempt local storage offline accounts first
+    const offlineAccounts = JSON.parse(localStorage.getItem('los_offline_accounts') || '[]');
+    const localAcc = offlineAccounts.find(a => a.email === finalEmail);
+
+    if (!supabase) {
+      if (localAcc && localAcc.password === password) {
+        setUser(localAcc.user);
+        setLoading(false);
+        toast.success('Signed in successfully (Offline Mode) 👋');
+        return { success: true };
+      }
+      setLoading(false);
+      return { success: false, error: 'Authentication service not configured and account not found locally.' };
     }
 
     try {
@@ -153,8 +163,31 @@ export function AuthProvider({ children }) {
       if (error) {
         setLoading(false);
         const msg = error.message?.toLowerCase() || '';
-        if (msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('too many attempts')) {
-          console.warn('[Auth] Rate limit detected during login. Switched to offline access.');
+        
+        // If it's explicitly wrong password/credentials on a known local account, let them know.
+        // Otherwise, if there is a local account and password matches, log them in.
+        if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
+          if (localAcc && localAcc.password === password) {
+            setUser(localAcc.user);
+            toast.success('Signed in successfully (Offline Mode) 👋');
+            return { success: true };
+          }
+          return { success: false, error: isUsername ? 'Incorrect username or password.' : 'Incorrect email or password.' };
+        }
+        
+        if (msg.includes('email not confirmed')) {
+          return { success: false, error: 'Please verify your email before signing in. Check your inbox for a confirmation link.' };
+        }
+
+        // Fall back to offline mode for rate limits, API key issues, or connectivity problems
+        if (localAcc && localAcc.password === password) {
+          setUser(localAcc.user);
+          toast.success('Signed in successfully (Offline Mode) 👋');
+          return { success: true };
+        }
+
+        // Create a temporary session if they don't have an offline account yet but connectivity failed
+        if (msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('too many attempts') || msg.includes('api key') || msg.includes('failed to fetch') || msg.includes('network') || msg.includes('bad request')) {
           const localUser = {
             id: 'local_offline_' + usernameOrEmail.split('@')[0],
             email: finalEmail,
@@ -168,16 +201,12 @@ export function AuthProvider({ children }) {
           toast.success('Offline Access Activated! 🚀');
           return { success: true };
         }
-        if (msg.includes('invalid login credentials') || msg.includes('invalid_credentials')) {
-          return { success: false, error: isUsername ? 'Incorrect username or password.' : 'Incorrect email or password.' };
-        }
-        if (msg.includes('email not confirmed')) {
-          return { success: false, error: 'Please verify your email before signing in. Check your inbox for a confirmation link.' };
-        }
+
         return { success: false, error: error.message || 'Sign-in failed. Please try again.' };
       }
       
       if (data?.user) {
+        setUser(data.user);
         setLoading(false);
         return { success: true };
       }
@@ -187,22 +216,65 @@ export function AuthProvider({ children }) {
     } catch (err) {
       setLoading(false);
       console.error('[Auth] Login error:', err);
-      return { success: false, error: 'Unable to connect to authentication service. Check your internet connection.' };
+      
+      if (localAcc && localAcc.password === password) {
+        setUser(localAcc.user);
+        toast.success('Signed in successfully (Offline Mode) 👋');
+        return { success: true };
+      }
+      
+      // Auto login offline if connection is broken
+      const localUser = {
+        id: 'local_offline_' + usernameOrEmail.split('@')[0],
+        email: finalEmail,
+        user_metadata: {
+          name: usernameOrEmail.split('@')[0],
+          full_name: usernameOrEmail.split('@')[0],
+          avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${usernameOrEmail}`
+        }
+      };
+      setUser(localUser);
+      toast.success('Offline Access Activated! 🚀');
+      return { success: true };
     }
   }, []);
 
   const signup = useCallback(async ({ name, usernameOrEmail, password }) => {
     setLoading(true);
 
-    if (!supabase) {
-      setLoading(false);
-      return { success: false, error: 'Authentication service is not configured. Please contact support.' };
-    }
-
     let finalEmail = usernameOrEmail.trim().toLowerCase();
     const isUsername = !finalEmail.includes('@');
     if (isUsername) {
       finalEmail = `${finalEmail}@axinite.os`;
+    }
+
+    const localUser = {
+      id: 'local_offline_' + usernameOrEmail.split('@')[0],
+      email: finalEmail,
+      user_metadata: {
+        name: name || usernameOrEmail.split('@')[0],
+        full_name: name || usernameOrEmail.split('@')[0],
+        avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${usernameOrEmail}`
+      }
+    };
+
+    const registerOfflineLocal = () => {
+      const offlineAccounts = JSON.parse(localStorage.getItem('los_offline_accounts') || '[]');
+      const existing = offlineAccounts.find(a => a.email === finalEmail);
+      if (existing) {
+        setLoading(false);
+        return { success: false, error: isUsername ? 'This username is already taken locally.' : 'This email is already registered locally.' };
+      }
+      offlineAccounts.push({ email: finalEmail, password, user: localUser });
+      localStorage.setItem('los_offline_accounts', JSON.stringify(offlineAccounts));
+      setUser(localUser);
+      setLoading(false);
+      toast.success('Offline Account Created successfully! 🚀');
+      return { success: true, isNew: true, needsConfirmation: false };
+    };
+
+    if (!supabase) {
+      return registerOfflineLocal();
     }
 
     try {
@@ -218,21 +290,6 @@ export function AuthProvider({ children }) {
       if (error) {
         setLoading(false);
         const msg = error.message?.toLowerCase() || '';
-        if (msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('too many attempts')) {
-          console.warn('[Auth] Rate limit detected during signup. Switched to offline access.');
-          const localUser = {
-            id: 'local_offline_' + usernameOrEmail.split('@')[0],
-            email: finalEmail,
-            user_metadata: {
-              name: name || usernameOrEmail.split('@')[0],
-              full_name: name || usernameOrEmail.split('@')[0],
-              avatar_url: `https://api.dicebear.com/7.x/adventurer/svg?seed=${usernameOrEmail}`
-            }
-          };
-          setUser(localUser);
-          toast.success('Offline Access Activated! 🚀');
-          return { success: true };
-        }
         if (msg.includes('already registered') || msg.includes('already been registered')) {
           return { success: false, error: isUsername ? 'This username is already taken. Please pick another one.' : 'This email is already registered.' };
         }
@@ -242,7 +299,9 @@ export function AuthProvider({ children }) {
         if (msg.includes('valid email') || msg.includes('invalid')) {
           return { success: false, error: isUsername ? 'Invalid username format.' : 'Please enter a valid email address.' };
         }
-        return { success: false, error: error.message || 'Sign-up failed. Please try again.' };
+
+        console.warn('[Auth] Supabase signup error, falling back to local database:', error.message);
+        return registerOfflineLocal();
       }
       
       if (data?.user) {
@@ -250,23 +309,22 @@ export function AuthProvider({ children }) {
         if (data.user.identities?.length === 0) {
           return { success: false, error: isUsername ? 'This username is already taken. Please pick another one.' : 'This email is already registered.' };
         }
-        // If it's username-based, we don't need email verification!
         if (isUsername) {
+          setUser(data.user);
           return { success: true, isNew: true, needsConfirmation: false };
         }
-        // If email is not confirmed yet, tell the user to check their inbox
         if (!data.user.email_confirmed_at && !data.session) {
           return { success: true, isNew: true, needsConfirmation: true };
         }
+        setUser(data.user);
         return { success: true, isNew: true, needsConfirmation: false };
       }
       
-      setLoading(false);
-      return { success: false, error: 'Sign-up failed. Please try again.' };
+      console.warn('[Auth] No user data returned from Supabase, falling back to local database');
+      return registerOfflineLocal();
     } catch (err) {
-      setLoading(false);
       console.error('[Auth] Signup error:', err);
-      return { success: false, error: 'Unable to connect to authentication service. Check your internet connection.' };
+      return registerOfflineLocal();
     }
   }, []);
 
