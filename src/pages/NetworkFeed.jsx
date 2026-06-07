@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { USERS, getStore, updateStore } from './NetworkData';
+import { useState, useMemo } from 'react';
+import { buildUsersList, getStore, updateStore } from './NetworkData';
 import { useAuth } from '@context/AuthContext';
+import { useApp } from '@context/AppContext';
 import { initials } from '@utils';
 
 const SUBJ_COLORS = { Physics:'#60a5fa', Biology:'#09cd83', Mathematics:'#a78bfa', Chemistry:'#e9cd6e' };
@@ -9,8 +10,10 @@ const TYPE_LABELS = { question:'Asked a Doubt', achievement:'Achievement Unlocke
 
 export default function NetworkFeed() {
   const { user } = useAuth();
+  const { progress } = useApp();
   const myName = user?.name || 'You';
   const myAvatar = initials(myName);
+  const USERS = useMemo(() => buildUsersList(user, progress), [user, progress]);
   const [store, setStore] = useState(getStore);
   const [newPost, setNewPost] = useState('');
   const [postType, setPostType] = useState('post');

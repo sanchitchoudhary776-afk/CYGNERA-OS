@@ -734,6 +734,9 @@ a {
     gap: var(--gap-page);
     contain: layout style;
     content-visibility: auto;
+    width: 78% !important;
+    max-width: 1400px !important;
+    margin: 0 auto !important;
   }
 }
 
@@ -821,15 +824,18 @@ a {
   letter-spacing: -0.01em;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: transform 200ms ease, box-shadow 200ms ease, background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  transition: transform 180ms var(--smooth), box-shadow 180ms ease, background-color 180ms ease, color 180ms ease, border-color 180ms ease;
   white-space: nowrap;
   user-select: none;
   position: relative;
   overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .btn:active {
-  transform: scale(0.96);
+  transform: scale(0.94) translateZ(0);
+  transition-duration: 60ms;
 }
 
 .btn-primary {
@@ -892,11 +898,31 @@ a {
   cursor: pointer;
   transition: all 180ms var(--ease);
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .icon-btn:hover {
   background: var(--s4);
   color: var(--t1);
+}
+
+.icon-btn:active {
+  transform: scale(0.88) translateZ(0);
+  transition-duration: 50ms;
+}
+
+/* ══ Orbit Navigation Item ════════════════════════ */
+.orbit-item {
+  transition: transform 180ms var(--bounce);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  will-change: transform;
+}
+
+.orbit-item:active {
+  transform: scale(0.88) translateZ(0);
+  transition-duration: 50ms;
 }
 
 /* ══ Form Elements ════════════════════════════════ */

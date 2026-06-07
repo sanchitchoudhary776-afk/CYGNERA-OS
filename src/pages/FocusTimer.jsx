@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAudio } from '@context/AudioContext';
-import { useApp, useTimer } from '@context/AppContext';
+import { useApp, useTimer, playAlarmSound, stopAlarmSound, fireNativeNotification } from '@context/AppContext';
 import { useFocusShield } from '@context/FocusShieldContext';
 import { useNetwork } from '@context/NetworkContext';
 import { timerSettings, moodCoaching } from '@services/ai';
@@ -18,7 +18,7 @@ function fmt(s) {
 }
 
 // ── Ultimate Hybrid 3D Aura Dial ──────────────
-const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, disabled, running, remain }) {
+const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, disabled, running, remain, isBreak }) {
   const containerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [svgSize, setSvgSize] = useState(window.innerWidth < 640 ? 290 : 420);
@@ -139,7 +139,14 @@ const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, d
 
       {/* Background ambient aura glow — pre-blurred radial gradient (no runtime filter) */}
       {running && (
-        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: svgSize * 0.8, height: svgSize * 0.8, borderRadius: '50%', background: 'radial-gradient(circle, rgba(9,205,131,0.15) 0%, rgba(9,205,131,0.05) 40%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          width: svgSize * 0.8, height: svgSize * 0.8, borderRadius: '50%',
+          background: isBreak
+            ? 'radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, rgba(124, 58, 237, 0.05) 40%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(9, 205, 131, 0.15) 0%, rgba(9, 205, 131, 0.05) 40%, transparent 70%)',
+          pointerEvents: 'none', zIndex: 0
+        }} />
       )}
 
       {/* 1. Outer Scale & SVG Progress Track */}
@@ -152,6 +159,11 @@ const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, d
             <stop offset="0%" stopColor="#0f3443" />
             <stop offset="50%" stopColor="var(--p)" />
             <stop offset="100%" stopColor="#34e89e" />
+          </linearGradient>
+          <linearGradient id="breakAura" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#1e1b4b" />
+            <stop offset="50%" stopColor="#6366f1" />
+            <stop offset="100%" stopColor="#a855f7" />
           </linearGradient>
         </defs>
 
@@ -175,7 +187,7 @@ const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, d
         />
         <circle
           cx={center} cy={center} r={trackRadius}
-          fill="none" stroke="url(#luxuryAura)" strokeWidth={strokeWidth}
+          fill="none" stroke={isBreak ? "url(#breakAura)" : "url(#luxuryAura)"} strokeWidth={strokeWidth}
           strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashoffset}
           style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: isDragging ? 'none' : 'stroke-dashoffset 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)' }}
         />
@@ -204,8 +216,10 @@ const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, d
           <div style={{
             position: 'absolute', top: svgSize === 290 ? 8 : 12, left: '50%', transform: 'translateX(-50%)',
             width: svgSize === 290 ? 6 : 8, height: svgSize === 290 ? 14 : 20, borderRadius: 999,
-            background: running ? 'var(--p)' : 'var(--t4)',
-            boxShadow: running ? '0 0 16px var(--p), inset 0 2px 4px rgba(255,255,255,0.8)' : 'inset 0 2px 4px rgba(0,0,0,0.3)',
+            background: running ? (isBreak ? '#6366f1' : 'var(--p)') : 'var(--t4)',
+            boxShadow: running 
+              ? (isBreak ? '0 0 16px #6366f1, inset 0 2px 4px rgba(255,255,255,0.8)' : '0 0 16px var(--p), inset 0 2px 4px rgba(255,255,255,0.8)') 
+              : 'inset 0 2px 4px rgba(0,0,0,0.3)',
             transition: 'background 0.3s, box-shadow 0.3s'
           }} />
 
@@ -224,7 +238,7 @@ const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, d
         pointerEvents: 'none', zIndex: 10
       }}>
         <p style={{
-          fontSize: remain >= 6000 ? (svgSize === 290 ? '1.6rem' : '2.4rem') : (svgSize === 290 ? '1.8rem' : 'clamp(2.5rem, 7vw, 3.2rem)'),
+          fontSize: remain >= 6000 ? (svgSize === 290 ? '1.4rem' : '2.1rem') : (svgSize === 290 ? '1.6rem' : 'clamp(2.2rem, 6.5vw, 2.9rem)'),
           fontWeight: 300, color: 'var(--t1)',
           letterSpacing: '-0.02em', lineHeight: 1, fontVariantNumeric: 'tabular-nums',
           fontFamily: "'Inter', sans-serif", textShadow: '0 4px 12px rgba(0,0,0,0.4)',
@@ -235,15 +249,29 @@ const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, d
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: svgSize === 290 ? 4 : 8 }}>
           {running ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(9, 205, 131, 0.1)', padding: '2px 8px', borderRadius: 999, border: '1px solid rgba(9, 205, 131, 0.2)' }}>
-              <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--p)', boxShadow: '0 0 8px var(--p)', animation: 'pulseDot 1.4s ease-in-out infinite' }} />
-              <p style={{ fontSize: 8, color: 'var(--p)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', whiteSpace: 'nowrap' }}>
-                In Flow
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              background: isBreak ? 'rgba(124, 58, 237, 0.1)' : 'rgba(9, 205, 131, 0.1)',
+              padding: '2px 8px', borderRadius: 999,
+              border: isBreak ? '1px solid rgba(124, 58, 237, 0.2)' : '1px solid rgba(9, 205, 131, 0.2)'
+            }}>
+              <div style={{
+                width: 4, height: 4, borderRadius: '50%',
+                background: isBreak ? '#a78bfa' : 'var(--p)',
+                boxShadow: isBreak ? '0 0 8px #a78bfa' : '0 0 8px var(--p)',
+                animation: 'pulseDot 1.4s ease-in-out infinite'
+              }} />
+              <p style={{
+                fontSize: 8,
+                color: isBreak ? '#a78bfa' : 'var(--p)',
+                fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', whiteSpace: 'nowrap'
+              }}>
+                {isBreak ? 'On Break' : 'In Flow'}
               </p>
             </div>
           ) : (
             <p style={{ fontSize: svgSize === 290 ? 8 : 11, color: 'var(--t4)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.1em', whiteSpace: 'nowrap' }}>
-              {value} Min Selected
+              {isBreak ? `${value} Min Break` : `${value} Min Selected`}
             </p>
           )}
         </div>
@@ -577,7 +605,7 @@ const SoundScape = memo(function SoundScape() {
 export default function FocusTimer() {
   const { A } = useApp();
   const timer = useTimer();
-  const { remain, isRunning: running, duration: durationMins, subject } = timer;
+  const { remain, isRunning: running, duration: durationMins, subject, isBreak } = timer;
 
   const { activateShield, deactivateShield } = useFocusShield();
   const { isOnline } = useNetwork();
@@ -588,8 +616,10 @@ export default function FocusTimer() {
   const [isZen, setIsZen] = useState(false);
   const [aiTip, setAiTip] = useState('');
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+  const [showSessionComplete, setShowSessionComplete] = useState(false);
+  const [showBreakComplete, setShowBreakComplete] = useState(false);
   const prevRemain = useRef(remain);
-  const color = 'var(--p)';
+  const color = isBreak ? '#a78bfa' : 'var(--p)';
 
   useEffect(() => {
     const handleResize = () => setIsDesktop(window.innerWidth > 1024);
@@ -599,7 +629,7 @@ export default function FocusTimer() {
 
   // Focus Shield Activation Trigger
   useEffect(() => {
-    if (running) {
+    if (running && !isBreak) {
       activateShield();
     } else {
       deactivateShield();
@@ -607,7 +637,7 @@ export default function FocusTimer() {
     return () => {
       deactivateShield();
     };
-  }, [running, activateShield, deactivateShield]);
+  }, [running, isBreak, activateShield, deactivateShield]);
 
   // Fetch AI timer tip
   useEffect(() => {
@@ -615,16 +645,33 @@ export default function FocusTimer() {
       setAiTip('Tip: Define a single clear objective before starting your session.');
       return;
     }
-    timerSettings({ sessions }).then(r => { if (r?.preSessionTip) setAiTip(r.preSessionTip); });
+    timerSettings({ sessions }).then(r => { if (r?.preSessionTip) setAiTip(r.preSessionTip); }).catch(() => {});
   }, [sessions, isOnline]);
 
-  // Watch for session end (global state will set remain to 0 and isRunning to false)
+  // Watch for focus session end (global state will set remain to 0 and isRunning to false)
   useEffect(() => {
-    if (prevRemain.current > 0 && remain === 0 && !running) {
+    if (prevRemain.current > 0 && remain === 0 && !running && !isBreak) {
       onEnd();
     }
     prevRemain.current = remain;
-  }, [remain, running]);
+  }, [remain, running, isBreak]);
+
+  // Watch for break auto-completion vs manual cancellation
+  const prevIsBreak = useRef(isBreak);
+  useEffect(() => {
+    if (prevIsBreak.current && !isBreak) {
+      if (prevRemain.current <= 1) {
+        // Break auto-completed!
+        playAlarmSound();
+        setShowBreakComplete(true);
+        toast.success("Break finished! Study session resumed. 📚", { duration: 4000 });
+      } else {
+        // Break ended manually by user
+        toast.success("Resumed study session. 📚", { duration: 2000 });
+      }
+    }
+    prevIsBreak.current = isBreak;
+  }, [isBreak]);
 
   const onEnd = () => {
     const mins = durationMins;
@@ -632,6 +679,30 @@ export default function FocusTimer() {
     setHistory(h => [{ subject, minutes: mins, at: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) }, ...h].slice(0, 8));
     toast.success(`+${mins}m session complete! 🎯`, { duration: 4000 });
     A.progress.timerDone(mins);
+    playAlarmSound();
+    setShowSessionComplete(true);
+  };
+
+  const handleStartBreak = (mins) => {
+    stopAlarmSound();
+    setShowSessionComplete(false);
+    A.timer.startBreak(mins);
+  };
+
+  const handleDismissSessionComplete = () => {
+    stopAlarmSound();
+    setShowSessionComplete(false);
+    A.timer.reset();
+  };
+
+  const handleStartFocusFromBreak = () => {
+    stopAlarmSound();
+    setShowBreakComplete(false);
+  };
+
+  const handleDismissBreakComplete = () => {
+    stopAlarmSound();
+    setShowBreakComplete(false);
   };
 
   const handleSliderChange = useCallback((m) => {
@@ -686,9 +757,10 @@ export default function FocusTimer() {
             <CircularDialSlider
               value={durationMins}
               onChange={handleSliderChange}
-              disabled={running}
+              disabled={running || isBreak}
               running={running}
               remain={remain}
+              isBreak={isBreak}
             />
           </div>
 
@@ -705,22 +777,23 @@ export default function FocusTimer() {
                 boxShadow: 'var(--sh)'
               }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--t4)' }}>api</span>
-                <select value={subject} onChange={e => A.timer.setSub(e.target.value)} disabled={running}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--t1)', fontWeight: 700, fontSize: 15, outline: 'none', cursor: running ? 'not-allowed' : 'pointer', flex: 1 }}>
+                <select value={subject} onChange={e => A.timer.setSub(e.target.value)} disabled={running || isBreak}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--t1)', fontWeight: 700, fontSize: 15, outline: 'none', cursor: (running || isBreak) ? 'not-allowed' : 'pointer', flex: 1 }}>
                   {SUBJECTS.map(s => <option key={s} style={{ background: 'var(--s3)', color: 'var(--t1)' }}>{s}</option>)}
                 </select>
               </div>
 
               {/* Controls */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                <button onClick={() => A.timer.reset()}
+                <button onClick={isBreak ? () => A.timer.resetBreak() : () => A.timer.reset()}
                   className="icon-btn" style={{
                     width: 56, height: 56, borderRadius: '50%',
                     background: 'var(--s3)', border: '1px solid var(--surface-b)',
                     color: 'var(--t3)', transition: 'all 0.3s var(--bounce)',
-                    opacity: remain === (durationMins * 60) && !running ? 0.3 : 1
-                  }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 24 }}>refresh</span>
+                    opacity: !isBreak && remain === (durationMins * 60) && !running ? 0.3 : 1
+                  }}
+                  title={isBreak ? "Skip Break" : "Reset Timer"}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 24 }}>{isBreak ? 'cancel' : 'refresh'}</span>
                 </button>
 
                 <button onClick={running ? () => A.timer.pause() : handleStart}
@@ -732,11 +805,15 @@ export default function FocusTimer() {
                     cursor: 'pointer', fontWeight: 800, fontSize: 15,
                     background: running
                       ? 'rgba(255,255,255,0.05)'
-                      : 'linear-gradient(135deg, rgba(9,205,131,0.25), rgba(6,182,212,0.15))',
+                      : (isBreak 
+                          ? 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(99,102,241,0.15))'
+                          : 'linear-gradient(135deg, rgba(9,205,131,0.25), rgba(6,182,212,0.15))'),
                     color: 'var(--t1)',
                     boxShadow: running
                       ? 'none'
-                      : '0 12px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px var(--p-glow)',
+                      : (isBreak 
+                          ? '0 12px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px rgba(124,58,237,0.3)'
+                          : '0 12px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px var(--p-glow)'),
                     transition: 'all 400ms var(--ease)',
                     transform: 'scale(1)',
                     position: 'relative',
@@ -747,25 +824,33 @@ export default function FocusTimer() {
                   onMouseEnter={e => {
                     if (!running) {
                       e.currentTarget.style.transform = 'scale(1.02) translateY(-1px)';
-                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(9,205,131,0.35), rgba(6,182,212,0.25))';
-                      e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,0,0,0.3), 0 0 30px var(--p-glow)';
+                      e.currentTarget.style.background = isBreak 
+                        ? 'linear-gradient(135deg, rgba(124,58,237,0.35), rgba(99,102,241,0.25))'
+                        : 'linear-gradient(135deg, rgba(9,205,131,0.35), rgba(6,182,212,0.25))';
+                      e.currentTarget.style.boxShadow = isBreak
+                        ? '0 15px 30px rgba(0,0,0,0.3), 0 0 30px rgba(124,58,237,0.45)'
+                        : '0 15px 30px rgba(0,0,0,0.3), 0 0 30px var(--p-glow)';
                     }
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.background = running
                       ? 'rgba(255,255,255,0.05)'
-                      : 'linear-gradient(135deg, rgba(9,205,131,0.25), rgba(6,182,212,0.15))';
+                      : (isBreak
+                          ? 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(99,102,241,0.15))'
+                          : 'linear-gradient(135deg, rgba(9,205,131,0.25), rgba(6,182,212,0.15))');
                     e.currentTarget.style.boxShadow = running
                       ? 'none'
-                      : '0 12px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px var(--p-glow)';
+                      : (isBreak
+                          ? '0 12px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px rgba(124,58,237,0.3)'
+                          : '0 12px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05), 0 0 20px var(--p-glow)');
                   }}>
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%)', pointerEvents: 'none' }} />
-                  <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1", color: running ? 'var(--t1)' : 'var(--p)' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 22, fontVariationSettings: "'FILL' 1", color: running ? 'var(--t1)' : (isBreak ? '#a78bfa' : 'var(--p)') }}>
                     {running ? 'pause_circle' : 'play_circle'}
                   </span>
                   <span style={{ position: 'relative', zIndex: 1, letterSpacing: '0.02em' }}>
-                    {running ? 'Pause' : remain < (durationMins * 60) ? 'Resume' : 'Start Flow'}
+                    {running ? 'Pause' : (isBreak ? 'Resume Break' : (remain < (durationMins * 60) ? 'Resume' : 'Start Flow'))}
                   </span>
                 </button>
 
@@ -780,6 +865,117 @@ export default function FocusTimer() {
                   <span className="material-symbols-outlined" style={{ fontSize: 24 }}>fullscreen</span>
                 </button>
               </div>
+
+              {/* Break actions with AnimatePresence */}
+              <AnimatePresence mode="wait">
+                {/* Break action during session */}
+                {remain < (durationMins * 60) && !isBreak && (
+                  <motion.div
+                    key="take-5-btn"
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: 8 }}
+                  >
+                    <button onClick={() => A.timer.startBreak(5)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 18px', borderRadius: 999,
+                        border: '1px solid rgba(167, 139, 250, 0.25)',
+                        background: 'rgba(167, 139, 250, 0.06)',
+                        color: '#c4b5fd', fontWeight: 700, fontSize: 12.5,
+                        cursor: 'pointer', transition: 'all 0.3s var(--bounce)',
+                        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.08)'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(167, 139, 250, 0.12)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(124, 58, 237, 0.18)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(167, 139, 250, 0.06)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.08)';
+                        e.currentTarget.style.transform = 'none';
+                      }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>coffee</span>
+                      Take 5-Min Break
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* Cancel/Reset Break */}
+                {isBreak && (
+                  <motion.div
+                    key="end-break-btn"
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: 8 }}
+                  >
+                    <button onClick={() => A.timer.resetBreak()}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 18px', borderRadius: 999,
+                        border: '1px solid rgba(248, 113, 113, 0.25)',
+                        background: 'rgba(248, 113, 113, 0.06)',
+                        color: '#fca5a5', fontWeight: 700, fontSize: 12.5,
+                        cursor: 'pointer', transition: 'all 0.3s var(--bounce)',
+                        boxShadow: '0 4px 12px rgba(239, 68, 68, 0.08)'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(248, 113, 113, 0.12)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(239, 68, 68, 0.18)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(248, 113, 113, 0.06)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.08)';
+                        e.currentTarget.style.transform = 'none';
+                      }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>cancel</span>
+                      End Break & Resume Focus
+                    </button>
+                  </motion.div>
+                )}
+
+                {/* Start 15m break when idle */}
+                {!running && !isBreak && remain === (durationMins * 60) && (
+                  <motion.div
+                    key="schedule-15-btn"
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    style={{ display: 'flex', justifyContent: 'center', width: '100%', marginTop: 8 }}
+                  >
+                    <button onClick={() => A.timer.startBreak(15)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 18px', borderRadius: 999,
+                        border: '1px solid rgba(167, 139, 250, 0.25)',
+                        background: 'rgba(167, 139, 250, 0.06)',
+                        color: '#c4b5fd', fontWeight: 700, fontSize: 12.5,
+                        cursor: 'pointer', transition: 'all 0.3s var(--bounce)',
+                        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.08)'
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(167, 139, 250, 0.12)';
+                        e.currentTarget.style.boxShadow = '0 6px 16px rgba(124, 58, 237, 0.18)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'rgba(167, 139, 250, 0.06)';
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.08)';
+                        e.currentTarget.style.transform = 'none';
+                      }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>coffee</span>
+                      Schedule 15-Min Break
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Divider */}
@@ -878,6 +1074,23 @@ export default function FocusTimer() {
             handleStart={handleStart}
             onClose={() => setIsZen(false)}
             A={A}
+            isBreak={isBreak}
+          />
+        </Portal>
+      )}
+      {showSessionComplete && (
+        <Portal>
+          <SessionCompleteModal
+            onStartBreak={() => handleStartBreak(15)}
+            onDismiss={handleDismissSessionComplete}
+          />
+        </Portal>
+      )}
+      {showBreakComplete && (
+        <Portal>
+          <BreakCompleteModal
+            onStartFocus={handleStartFocusFromBreak}
+            onDismiss={handleDismissBreakComplete}
           />
         </Portal>
       )}
@@ -910,7 +1123,7 @@ const ZEN_SCENES = [
 ];
 
 // ── Zen Mode Distraction-Free Fullscreen Overlay ──────────────────────────
-const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationMins, subject, handleStart, onClose, A }) {
+const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationMins, subject, handleStart, onClose, A, isBreak }) {
   const [showControls, setShowControls] = useState(true);
   const [mantraIndex, setMantraIndex] = useState(0);
   const [zenBg, setZenBg] = useState(() => localStorage.getItem('zen_scene') || 'none');
@@ -1033,7 +1246,9 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
         maxHeight: 800,
         borderRadius: '50%',
         background: running
-          ? 'radial-gradient(circle, rgba(9,205,131,0.08) 0%, rgba(6,182,212,0.03) 40%, transparent 70%)'
+          ? (isBreak 
+              ? 'radial-gradient(circle, rgba(124, 58, 237, 0.08) 0%, rgba(99, 102, 241, 0.03) 40%, transparent 70%)'
+              : 'radial-gradient(circle, rgba(9,205,131,0.08) 0%, rgba(6,182,212,0.03) 40%, transparent 70%)')
           : 'radial-gradient(circle, rgba(239,68,68,0.04) 0%, transparent 70%)',
         pointerEvents: 'none',
         zIndex: 0,
@@ -1070,8 +1285,8 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
           width: 6,
           height: 6,
           borderRadius: '50%',
-          background: running ? 'var(--p)' : 'var(--warn)',
-          boxShadow: running ? '0 0 12px var(--p)' : '0 0 12px var(--warn)',
+          background: running ? (isBreak ? '#a78bfa' : 'var(--p)') : 'var(--warn)',
+          boxShadow: running ? (isBreak ? '0 0 12px #a78bfa' : '0 0 12px var(--p)') : '0 0 12px var(--warn)',
           animation: running ? 'pulse 2s infinite' : 'none'
         }} />
         <span style={{
@@ -1082,7 +1297,7 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
           color: 'var(--t3)',
           fontFamily: "'Inter', sans-serif"
         }}>
-          {subject}
+          {isBreak ? `${durationMins}m Break` : subject}
         </span>
       </div>
 
@@ -1123,12 +1338,12 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
           style={{
             fontSize: 'clamp(8rem, 24vw, 18rem)',
             fontWeight: 100, // Ultra lightweight numbers
-            color: running ? '#ffffff' : 'var(--t3)',
+            color: running ? (isBreak ? '#c084fc' : '#ffffff') : 'var(--t3)',
             fontFamily: "'Inter', sans-serif",
             letterSpacing: '-0.05em',
             lineHeight: 0.95,
             margin: 0,
-            textShadow: running ? '0 10px 80px rgba(9,205,131,0.2)' : 'none',
+            textShadow: running ? (isBreak ? '0 10px 80px rgba(124,58,237,0.3)' : '0 10px 80px rgba(9,205,131,0.2)') : 'none',
             transition: 'color 1s ease, text-shadow 1s ease',
             fontVariantNumeric: 'tabular-nums'
           }}>
@@ -1139,7 +1354,7 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
         <div style={{ height: 30, marginTop: 40, overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <AnimatePresence mode="wait">
             <motion.p
-              key={mantraIndex + (running ? '_run' : '_pause')}
+              key={mantraIndex + (running ? '_run' : '_pause') + (isBreak ? '_break' : '')}
               initial={{ y: 15, opacity: 0 }}
               animate={{ y: 0, opacity: running ? 0.7 : 0.4 }}
               exit={{ y: -15, opacity: 0 }}
@@ -1147,7 +1362,7 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
               style={{
                 fontSize: 15,
                 fontWeight: 400,
-                color: running ? 'var(--t2)' : 'var(--warn)',
+                color: running ? (isBreak ? '#c084fc' : 'var(--t2)') : 'var(--warn)',
                 letterSpacing: '0.04em',
                 margin: 0,
                 textAlign: 'center',
@@ -1156,7 +1371,7 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
                 fontStyle: 'italic',
                 opacity: showControls ? 1 : (running ? 0.35 : 0.6) // Keep mantra slightly visible even when controls hide!
               }}>
-              {running ? MANTRAS[mantraIndex] : "Flow Session Paused"}
+              {running ? (isBreak ? "Rest your eyes. Enjoy your break." : MANTRAS[mantraIndex]) : "Flow Session Paused"}
             </motion.p>
           </AnimatePresence>
         </div>
@@ -1289,8 +1504,8 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
         pointerEvents: showControls ? 'auto' : 'none',
         zIndex: 10
       }}>
-        {/* Reset button */}
-        <button onClick={() => A.timer.reset()}
+        {/* Reset / Skip Break button */}
+        <button onClick={isBreak ? () => A.timer.resetBreak() : () => A.timer.reset()}
           className="icon-btn-zen" style={{
             width: 48, height: 48, borderRadius: '50%',
             background: 'transparent', border: 'none',
@@ -1298,13 +1513,34 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             transition: 'all 0.3s'
           }}
+          title={isBreak ? "Skip Break" : "Reset Timer"}
           onMouseEnter={e => e.currentTarget.style.color = '#fff'}
           onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}>
-          <span className="material-symbols-outlined" style={{ fontSize: 22 }}>refresh</span>
+          <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{isBreak ? 'cancel' : 'refresh'}</span>
         </button>
 
         {/* Small dividing indicator */}
         <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+
+        {/* Take 5-Min break during focus session (in Zen Mode) */}
+        {remain < (durationMins * 60) && !isBreak && (
+          <>
+            <button onClick={() => A.timer.startBreak(5)}
+              className="icon-btn-zen" style={{
+                width: 48, height: 48, borderRadius: '50%',
+                background: 'transparent', border: 'none',
+                color: 'rgba(255,255,255,0.6)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.3s'
+              }}
+              title="Take 5-Min Break"
+              onMouseEnter={e => e.currentTarget.style.color = '#a78bfa'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.6)'}>
+              <span className="material-symbols-outlined" style={{ fontSize: 22 }}>coffee</span>
+            </button>
+            <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.1)' }} />
+          </>
+        )}
 
         {/* Play/Pause Button */}
         <button onClick={running ? () => A.timer.pause() : handleStart}
@@ -1319,23 +1555,23 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
             cursor: 'pointer',
             fontWeight: 700,
             fontSize: 14,
-            background: running ? 'rgba(255,255,255,0.08)' : 'var(--p)',
-            color: running ? '#fff' : '#002a18',
-            boxShadow: running ? 'none' : '0 8px 24px rgba(9,205,131,0.3)',
+            background: running ? 'rgba(255,255,255,0.08)' : (isBreak ? '#7c3aed' : 'var(--p)'),
+            color: running ? '#fff' : (isBreak ? '#fff' : '#002a18'),
+            boxShadow: running ? 'none' : (isBreak ? '0 8px 24px rgba(124,58,237,0.3)' : '0 8px 24px rgba(9,205,131,0.3)'),
             transition: 'all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)'
           }}
           onMouseEnter={e => {
             if (!running) {
               e.currentTarget.style.transform = 'scale(1.03)';
-              e.currentTarget.style.boxShadow = '0 10px 30px rgba(9,205,131,0.5)';
+              e.currentTarget.style.boxShadow = isBreak ? '0 10px 30px rgba(124,58,237,0.5)' : '0 10px 30px rgba(9,205,131,0.5)';
             } else {
               e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
             }
           }}
           onMouseLeave={e => {
             e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.background = running ? 'rgba(255,255,255,0.08)' : 'var(--p)';
-            e.currentTarget.style.boxShadow = running ? 'none' : '0 8px 24px rgba(9,205,131,0.3)';
+            e.currentTarget.style.background = running ? 'rgba(255,255,255,0.08)' : (isBreak ? '#7c3aed' : 'var(--p)');
+            e.currentTarget.style.boxShadow = running ? 'none' : (isBreak ? '0 8px 24px rgba(124,58,237,0.3)' : '0 8px 24px rgba(9,205,131,0.3)');
           }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20, fontVariationSettings: "'FILL' 1" }}>
             {running ? 'pause' : 'play_arrow'}
@@ -1377,3 +1613,83 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
     </motion.div>
   );
 });
+
+// ── Session Complete Modal ────────────────────────
+function SessionCompleteModal({ onStartBreak, onDismiss }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(5, 5, 5, 0.85)', backdropFilter: 'blur(12px)',
+      padding: '20px', animation: 'modalFadeIn 220ms ease both'
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 420, background: 'var(--s2)',
+        border: '1px solid var(--card-b-h)', borderRadius: 'var(--r-xl)',
+        padding: 28, textAlign: 'center', boxShadow: 'var(--modal-sh)'
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(9, 205, 131, 0.1)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+          boxShadow: '0 0 20px rgba(9, 205, 131, 0.2)'
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--p)' }}>emoji_events</span>
+        </div>
+        <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--t1)', marginBottom: 8 }}>Session Completed! 🎯</h3>
+        <p style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.5, marginBottom: 24 }}>
+          Fantastic work! You completed your study block. Keep the momentum going by taking a well-deserved rest.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button onClick={onStartBreak} className="btn btn-primary" style={{ padding: '13px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>coffee</span>
+            Start 15-Min Break
+          </button>
+          <button onClick={onDismiss} className="btn btn-surface" style={{ padding: '13px', width: '100%' }}>
+            Dismiss
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Break Complete Modal ──────────────────────────
+function BreakCompleteModal({ onStartFocus, onDismiss }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(5, 5, 5, 0.85)', backdropFilter: 'blur(12px)',
+      padding: '20px', animation: 'modalFadeIn 220ms ease both'
+    }}>
+      <div style={{
+        width: '100%', maxWidth: 420, background: 'var(--s2)',
+        border: '1px solid var(--card-b-h)', borderRadius: 'var(--r-xl)',
+        padding: 28, textAlign: 'center', boxShadow: 'var(--modal-sh)'
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(124, 58, 237, 0.1)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px',
+          boxShadow: '0 0 20px rgba(124, 58, 237, 0.2)'
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 32, color: '#a78bfa' }}>notifications_active</span>
+        </div>
+        <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--t1)', marginBottom: 8 }}>Break Finished! ☕</h3>
+        <p style={{ fontSize: 13, color: 'var(--t3)', lineHeight: 1.5, marginBottom: 24 }}>
+          Your break is over. Ready to get back into the zone?
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <button onClick={onStartFocus} className="btn btn-primary" style={{ padding: '13px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>play_arrow</span>
+            Start Focus Session
+          </button>
+          <button onClick={onDismiss} className="btn btn-surface" style={{ padding: '13px', width: '100%' }}>
+            Dismiss Alarm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

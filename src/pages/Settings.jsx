@@ -8,6 +8,8 @@ import { SUBJECTS, initials } from '@utils';
 import { ThemeToggle } from '@components/ui';
 import toast from 'react-hot-toast';
 import { usePremium } from '@components/ui/PremiumUI';
+import DesktopFocusShield from '@components/focus/DesktopFocusShield';
+import MobileFocusShield from '@components/focus/MobileFocusShield';
 
 const STYLES = [
   { id: 'visual', icon: 'visibility', label: 'Visual', desc: 'Charts & diagrams' },
@@ -98,59 +100,14 @@ export default function Settings() {
   const { askConfirm } = usePremium();
   const aiOn = true;
   const isDesktop = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
-  const { settings: shieldSettings, updateSettings, addBlockedSite, removeBlockedSite, addBlockedApp, removeBlockedApp } = useFocusShield();
-  const [newSite, setNewSite] = useState('');
-  const [newApp, setNewApp] = useState('');
-  const [activeProcesses, setActiveProcesses] = useState([]);
-  const [installedApps, setInstalledApps] = useState([]);
-  const [loadingProcesses, setLoadingProcesses] = useState(false);
-  const [loadingInstalled, setLoadingInstalled] = useState(false);
-  const [showProcessPicker, setShowProcessPicker] = useState(false);
-  const [pickerTab, setPickerTab] = useState('running'); // 'running' | 'installed'
-  const [pickerSearch, setPickerSearch] = useState('');
 
-  const fetchRunningProcesses = async () => {
-    setLoadingProcesses(true);
-    try {
-      const res = await fetch('/api/processes');
-      if (res.ok) {
-        const data = await res.json();
-        const unique = [];
-        const seen = new Set();
-        for (const item of (Array.isArray(data) ? data : [])) {
-          if (!item || !item.ProcessName) continue;
-          const cleanName = item.ProcessName.trim();
-          if (!seen.has(cleanName.toLowerCase())) {
-            seen.add(cleanName.toLowerCase());
-            unique.push(item);
-          }
-        }
-        setActiveProcesses(unique.sort((a, b) => a.ProcessName.localeCompare(b.ProcessName)));
-      } else {
-        toast.error('Failed to query system applications.');
-      }
-    } catch (e) {
-      toast.error('Local background service is not running.');
-    } finally {
-      setLoadingProcesses(false);
-    }
-  };
-
-  const fetchInstalledApps = async () => {
-    setLoadingInstalled(true);
-    try {
-      const res = await fetch('/api/installed-apps');
-      if (res.ok) {
-        const data = await res.json();
-        const apps = (Array.isArray(data) ? data : [])
-          .filter(a => a && a.Name && !a.Name.startsWith('Uninstall'))
-          .sort((a, b) => a.Name.localeCompare(b.Name));
-        setInstalledApps(apps);
-      }
-    } catch {}
-    finally { setLoadingInstalled(false); }
-  };
 
   const [editName, setEditName] = useState(false);
   const [newName, setNewName] = useState(user?.name || '');
@@ -166,6 +123,26 @@ export default function Settings() {
   useEffect(() => {
     localStorage.setItem('los_notif_prefs', JSON.stringify(notifs));
   }, [notifs]);
+
+  const [hapticPrefs, setHapticPrefs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('los_haptics_prefs');
+      return saved ? JSON.parse(saved) : { enabled: true, vibrate: true, sound: true };
+    } catch {
+      return { enabled: true, vibrate: true, sound: true };
+    }
+  });
+
+  const handleHapticPrefChange = (key, val) => {
+    const next = { ...hapticPrefs, [key]: val };
+    next.enabled = next.vibrate || next.sound;
+    setHapticPrefs(next);
+    localStorage.setItem('los_haptics_prefs', JSON.stringify(next));
+    
+    import('../utils/haptics.js').then(m => {
+      m.triggerHaptic('medium');
+    });
+  };
 
   const saveName = () => {
     if (!newName.trim()) { toast.error('Name cannot be empty'); return; }
@@ -568,319 +545,70 @@ export default function Settings() {
             </div>
           </Section>
 
-          {/* Focus Shield Settings */}
-          <Section title="Focus Shield" delay={0.12}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '14px 16px',
-              background: 'var(--s3)',
-              borderRadius: 'var(--r-md)',
-              border: '1px solid var(--card-b-h)',
-              marginBottom: shieldSettings.enabled ? 16 : 0,
-              boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.02)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#ff6b6b' }}>shield</span>
-                </div>
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--t1)' }}>App Blocker Shield</span>
-              </div>
-              <Toggle
-                on={shieldSettings.enabled}
-                onChange={v => {
-                  updateSettings({ enabled: v });
-                  toast.success(`Focus Shield ${v ? 'enabled' : 'disabled'} 🛡️`);
-                }}
-              />
-            </div>
-
-            {shieldSettings.enabled && (
+          {/* Tactile Feedback */}
+          <Section title="Tactile Feedback" delay={0.1}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{
                 display: 'flex',
-                flexDirection: 'column',
-                gap: 14,
-                padding: '16px',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
                 background: 'var(--s3)',
                 borderRadius: 'var(--r-md)',
                 border: '1px solid var(--card-b-h)',
                 boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.02)'
               }}>
-                {/* Fullscreen Lock */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingBottom: 12,
-                  borderBottom: '1px solid rgba(255,255,255,0.04)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#60a5fa' }}>fullscreen</span>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', display: 'block' }}>Fullscreen Lock</span>
-                      <span style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.3, display: 'block', marginTop: 2 }}>Forces browser fullscreen during focus. Re-locks if you press Esc.</span>
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(9,205,131,0.1)', border: '1px solid rgba(9,205,131,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--p)' }}>sensors_gesture</span>
                   </div>
-                  <Toggle
-                    on={shieldSettings.fullscreenLock}
-                    onChange={v => {
-                      updateSettings({ fullscreenLock: v });
-                      toast.success(`Fullscreen Lock ${v ? 'enabled' : 'disabled'} 🖥️`);
-                    }}
-                  />
-                </div>
-
-                {/* Strictness Matrix */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingBottom: 12,
-                  borderBottom: '1px solid rgba(255,255,255,0.04)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#fb923c' }}>tune</span>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>Strictness Matrix</span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 3, background: 'var(--bg-deep)', padding: 3, borderRadius: 10, border: '1px solid var(--card-b-h)' }}>
-                    {['gentle', 'strict', 'lockdown'].map(lvl => {
-                      const active = shieldSettings.strictness === lvl;
-                      return (
-                        <button
-                          key={lvl}
-                          onClick={() => {
-                            updateSettings({ strictness: lvl });
-                            toast.success(`Strictness: ${lvl.toUpperCase()} 🚨`);
-                          }}
-                          style={{
-                            fontSize: 9.5,
-                            fontWeight: 850,
-                            textTransform: 'uppercase',
-                            padding: '6px 12px',
-                            borderRadius: 7,
-                            border: 'none',
-                            cursor: 'pointer',
-                            background: active ? 'linear-gradient(135deg, var(--p-lt), var(--p))' : 'transparent',
-                            color: active ? 'var(--bg-deep)' : 'var(--t3)',
-                            boxShadow: active ? '0 3px 8px rgba(9, 205, 131, 0.2)' : 'none',
-                            transition: 'all 200ms ease',
-                          }}
-                        >
-                          {lvl}
-                        </button>
-                      );
-                    })}
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', display: 'block' }}>Haptic Vibration</span>
+                    <span style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.3, display: 'block', marginTop: 2 }}>Physical response when tapping buttons (Android/Chrome).</span>
                   </div>
                 </div>
-
-                {/* Blocked Sites */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#a78bfa' }}>block</span>
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>Distraction Blocklist</span>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      className="input"
-                      placeholder="e.g. instagram.com, youtube.com"
-                      value={newSite}
-                      onChange={e => setNewSite(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          addBlockedSite(newSite);
-                          setNewSite('');
-                        }
-                      }}
-                      style={{ padding: '8px 12px', fontSize: 12.5, flex: 1 }}
-                    />
-                    <button
-                      onClick={() => {
-                        addBlockedSite(newSite);
-                        setNewSite('');
-                      }}
-                      className="btn btn-primary"
-                      style={{ padding: '8px 16px', fontSize: 12.5, flexShrink: 0 }}
-                    >
-                      Add
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
-                    {shieldSettings.blockedSites.map(site => (
-                      <span
-                        key={site}
-                        style={{
-                          fontSize: 10.5,
-                          fontWeight: 750,
-                          padding: '4px 10px',
-                          borderRadius: 99,
-                          background: 'rgba(255,107,107,0.06)',
-                          color: '#ff6b6b',
-                          border: '1px solid rgba(255,107,107,0.15)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {site}
-                        <span
-                          className="material-symbols-outlined"
-                          onClick={() => removeBlockedSite(site)}
-                          style={{ fontSize: 13, cursor: 'pointer', opacity: 0.7 }}
-                          onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                          onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
-                        >
-                          close
-                        </span>
-                      </span>
-                    ))}
-                    {shieldSettings.blockedSites.length === 0 && (
-                      <p style={{ fontSize: 11.5, color: 'var(--t4)', fontStyle: 'italic', margin: '4px 0 0' }}>No sites blocked yet.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Blocked Applications — Desktop (localhost) Only */}
-                {isDesktop ? (
-                <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#f43f5e' }}>bolt</span>
-                      </div>
-                      <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>Deep App Blocker (Windows)</span>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowProcessPicker(true);
-                        setPickerTab('running');
-                        setPickerSearch('');
-                        fetchRunningProcesses();
-                        fetchInstalledApps();
-                      }}
-                      className="btn btn-surface"
-                      style={{ padding: '6px 12px', fontSize: 11, borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6 }}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 14 }}>page_info</span>
-                      Scan System Apps
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      className="input"
-                      placeholder="e.g. spotify, discord, steam"
-                      value={newApp}
-                      onChange={e => setNewApp(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          addBlockedApp(newApp);
-                          setNewApp('');
-                        }
-                      }}
-                      style={{ padding: '8px 12px', fontSize: 12.5, flex: 1 }}
-                    />
-                    <button
-                      onClick={() => {
-                        addBlockedApp(newApp);
-                        setNewApp('');
-                      }}
-                      className="btn btn-primary"
-                      style={{ padding: '8px 16px', fontSize: 12.5, flexShrink: 0 }}
-                    >
-                      Block
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
-                    {(shieldSettings.blockedApps || []).map(app => (
-                      <span
-                        key={app}
-                        style={{
-                          fontSize: 10.5,
-                          fontWeight: 750,
-                          padding: '4px 10px',
-                          borderRadius: 99,
-                          background: 'rgba(244,63,94,0.06)',
-                          color: '#f43f5e',
-                          border: '1px solid rgba(244,63,94,0.15)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {app}
-                        <span
-                          className="material-symbols-outlined"
-                          onClick={() => removeBlockedApp(app)}
-                          style={{ fontSize: 13, cursor: 'pointer', opacity: 0.7 }}
-                          onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                          onMouseLeave={e => e.currentTarget.style.opacity = 0.7}
-                        >
-                          close
-                        </span>
-                      </span>
-                    ))}
-                    {(shieldSettings.blockedApps || []).length === 0 && (
-                      <p style={{ fontSize: 11.5, color: 'var(--t4)', fontStyle: 'italic', margin: '4px 0 0' }}>No applications blocked yet.</p>
-                    )}
-                  </div>
-                </div>
-                ) : (
-                /* Mobile / Tablet Info Banner */
-                <div style={{ marginTop: 8, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{
-                    padding: '14px 16px',
-                    borderRadius: 'var(--r-md)',
-                    background: 'rgba(96,165,250,0.06)',
-                    border: '1px solid rgba(96,165,250,0.15)',
-                    display: 'flex',
-                    gap: 12,
-                    alignItems: 'flex-start'
-                  }}>
-                    <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#60a5fa' }}>smartphone</span>
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--t1)', marginBottom: 4 }}>Mobile Shield Active</p>
-                      <p style={{ fontSize: 11.5, color: 'var(--t3)', lineHeight: 1.5 }}>
-                        On mobile &amp; tablet, Focus Shield monitors tab switches, plays an alarm on breach, and keeps your screen awake during sessions. Deep App Blocker requires the desktop dev server.
-                      </p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                        {[
-                          { icon: 'visibility', label: 'Tab Monitor' },
-                          { icon: 'volume_up', label: 'Breach Alarm' },
-                          { icon: 'screen_lock_portrait', label: 'Wake Lock' },
-                          { icon: 'block', label: 'Site Blocklist' },
-                        ].map(f => (
-                          <span key={f.label} style={{
-                            fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 99,
-                            background: 'rgba(9,205,131,0.08)', color: 'var(--p)', border: '1px solid rgba(9,205,131,0.15)',
-                            display: 'inline-flex', alignItems: 'center', gap: 4
-                          }}>
-                            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{f.icon}</span>
-                            {f.label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                )}
+                <Toggle
+                  on={hapticPrefs.vibrate}
+                  onChange={v => handleHapticPrefChange('vibrate', v)}
+                />
               </div>
-            )}
+
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
+                background: 'var(--s3)',
+                borderRadius: 'var(--r-md)',
+                border: '1px solid var(--card-b-h)',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.02)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#60a5fa' }}>volume_up</span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', display: 'block' }}>Audio Click Feedback</span>
+                    <span style={{ fontSize: 11, color: 'var(--t3)', lineHeight: 1.3, display: 'block', marginTop: 2 }}>Synthesized mechanical click sound (supports iOS/Safari).</span>
+                  </div>
+                </div>
+                <Toggle
+                  on={hapticPrefs.sound}
+                  onChange={v => handleHapticPrefChange('sound', v)}
+                />
+              </div>
+            </div>
           </Section>
+
+          {/* Focus Shield Settings — Desktop vs Mobile */}
+          <Section title="Focus Shield" delay={0.12}>
+            {isMobile ? <MobileFocusShield /> : <DesktopFocusShield />}
+          </Section>
+
+
+
+
+
 
           {/* Notifications */}
           <Section title="Notifications" delay={0.1}>

@@ -243,6 +243,28 @@ function reducer(state, { type, payload }) {
       const now = Date.now();
       const diff = Math.max(0, Math.round((state.timer.endTime - now) / 1000));
       if (diff <= 0) {
+        if (state.timer.isBreak) {
+          // Auto-resume study session ONLY on short (5-minute) break completion
+          const saved = state.timer.savedStudySession;
+          const restoredDur = saved ? saved.duration : 25;
+          const restoredRemain = saved ? saved.remain : 1500;
+          const isShortBreak = state.timer.breakType === 'short';
+          const shouldResume = isShortBreak && restoredRemain > 0;
+          return {
+            ...state,
+            timer: {
+              ...state.timer,
+              isBreak: false,
+              breakType: null,
+              duration: restoredDur,
+              remain: restoredRemain,
+              subject: saved ? saved.subject : state.timer.subject,
+              isRunning: shouldResume,
+              endTime: shouldResume ? Date.now() + (restoredRemain * 1000) : 0,
+              savedStudySession: null
+            }
+          };
+        }
         return { ...state, timer: { ...state.timer, isRunning: false, remain: 0 } };
       }
       return { ...state, timer: { ...state.timer, remain: diff } };
@@ -252,17 +274,57 @@ function reducer(state, { type, payload }) {
     case 'TIMER_PAUSE':  return { ...state, timer: { ...state.timer, isRunning: false } };
     case 'TIMER_RESET':  
       const r = payload || (state.timer.duration * 60);
-      return { ...state, timer: { ...state.timer, isRunning: false, remain: r, endTime: 0 } };
-    case 'TIMER_SET_DUR':return { ...state, timer: { ...state.timer, duration: payload, remain: payload * 60, endTime: 0 } };
+      return { ...state, timer: { ...state.timer, isRunning: false, remain: r, endTime: 0, isBreak: false, breakType: null } };
+    case 'TIMER_SET_DUR':return { ...state, timer: { ...state.timer, duration: payload, remain: payload * 60, endTime: 0, isBreak: false, breakType: null } };
     case 'TIMER_SET_SUB':return { ...state, timer: { ...state.timer, subject: payload } };
     case 'TIMER_DONE':  return { ...state, timer: { ...state.timer, isRunning: false, remain: state.timer.duration * 60, endTime: 0 }, progress: { ...state.progress, focusSessions:state.progress.focusSessions+1, totalHours:round1(state.progress.totalHours+(payload/60)) } };
+    case 'TIMER_START_BREAK':
+      const breakDur = payload;
+      // Save the current study session state so we can restore it after the break
+      const savedSession = !state.timer.isBreak
+        ? { duration: state.timer.duration, remain: state.timer.remain, subject: state.timer.subject }
+        : state.timer.savedStudySession;
+      return {
+        ...state,
+        timer: {
+          ...state.timer,
+          isBreak: true,
+          breakType: breakDur === 5 ? 'short' : 'long',
+          duration: breakDur,
+          remain: breakDur * 60,
+          isRunning: true,
+          endTime: Date.now() + (breakDur * 60 * 1000),
+          savedStudySession: savedSession
+        }
+      };
+    case 'TIMER_RESET_BREAK':
+      // Restore study session and auto-resume ONLY if it was a short break
+      const saved = state.timer.savedStudySession;
+      const restoredDur = saved ? saved.duration : 25;
+      const restoredRemain = saved ? saved.remain : 1500;
+      const isShortBreakManual = state.timer.breakType === 'short';
+      const shouldResumeManual = isShortBreakManual && restoredRemain > 0;
+      return {
+        ...state,
+        timer: {
+          ...state.timer,
+          isBreak: false,
+          breakType: null,
+          duration: restoredDur,
+          remain: restoredRemain,
+          subject: saved ? saved.subject : state.timer.subject,
+          isRunning: shouldResumeManual,
+          endTime: shouldResumeManual ? Date.now() + (restoredRemain * 1000) : 0,
+          savedStudySession: null
+        }
+      };
     case 'SYNC_CLOUD':  return { ...state, ...payload, timer: payload.timer || state.timer };
     default: return state;
   }
 }
 const round1 = n => Math.round(n*10)/10;
 
-const DEFAULT_TIMER = { remain: 1500, isRunning: false, duration: 25, subject: 'Web Dev', endTime: 0 };
+const DEFAULT_TIMER = { remain: 1500, isRunning: false, duration: 25, subject: 'Web Dev', endTime: 0, isBreak: false, breakType: null, savedStudySession: null };
 
 // ── Versioned Local Storage ─────────────────
 const STORAGE_KEY = 'los_v5';
@@ -276,6 +338,10 @@ function loadState() {
     const data = JSON.parse(s);
     // Ensure new properties exist for backwards compatibility
     if (!data.timer) data.timer = DEFAULT_TIMER;
+    else {
+      if (data.timer.isBreak === undefined) data.timer.isBreak = false;
+      if (data.timer.breakType === undefined) data.timer.breakType = null;
+    }
     if (!data.achievements) data.achievements = [];
     if (!data.videos) data.videos = [];
     if (!data.paths) data.paths = [];
@@ -297,7 +363,12 @@ function saveLocal(state) {
     const toSave = { ...state, _dataVersion: DATA_VERSION };
     // Reset timer running state (not meaningful across sessions)
     if (toSave.timer?.isRunning) {
-      toSave.timer = { ...toSave.timer, isRunning: false, endTime: 0, remain: (toSave.timer.duration || 25) * 60 };
+      toSave.timer = { 
+        ...toSave.timer, 
+        isRunning: false, 
+        endTime: 0, 
+        remain: (toSave.timer.isBreak ? toSave.timer.duration : (toSave.timer.duration || 25)) * 60 
+      };
     }
     const serialized = JSON.stringify(toSave);
     localStorage.setItem(STORAGE_KEY, serialized);
@@ -898,6 +969,8 @@ export function AppProvider({ children }) {
       reset:    (m) => dispatch({ type:'TIMER_RESET', payload: m }),
       setDur:   (m) => dispatch({ type:'TIMER_SET_DUR', payload: m }),
       setSub:   (s) => dispatch({ type:'TIMER_SET_SUB', payload: s }),
+      startBreak: (m) => dispatch({ type:'TIMER_START_BREAK', payload: m }),
+      resetBreak: () => dispatch({ type:'TIMER_RESET_BREAK' }),
     }
   }), [dispatch]);
 

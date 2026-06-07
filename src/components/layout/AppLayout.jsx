@@ -217,7 +217,7 @@ export default function AppLayout({ children }) {
         }} />
 
         {/* Persistent Aura Bar (Top) (Direct DOM update) */}
-        <div ref={headerRef} style={{
+        <div ref={headerRef} className="app-header" style={{
           position: 'sticky',
           top: 0,
           zIndex: 100,

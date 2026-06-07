@@ -1,0 +1,35 @@
+{
+  "name": "AXINITE OS",
+  "short_name": "Axinite",
+  "description": "AI-powered custom study platform and learning operating system",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0e1510",
+  "theme_color": "#09cd83",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Study Timer",
+      "url": "/focus",
+      "description": "Start a deep focus block"
+    },
+    {
+      "name": "Study Notes",
+      "url": "/notes",
+      "description": "View and edit notes"
+    },
+    {
+      "name": "Progress Tracker",
+      "url": "/progress",
+      "description": "Track achievements and metrics"
+    }
+  ]
+}

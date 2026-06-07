@@ -46,9 +46,12 @@ export default async function handler(req, res) {
       return;
     }
 
-    const keys = envKey.split(',').map(k => k.trim()).filter(Boolean);
+    // Strip single/double quotes in case the user pasted them in the env file
+    const cleanEnvKey = envKey.replace(/['"]/g, '').trim();
+    const keys = cleanEnvKey.split(',').map(k => k.trim()).filter(Boolean);
     let lastError = null;
-    const retries = Math.min(5, keys.length * 2);
+    // Ensure we can retry across all provided keys, up to a maximum of 30 keys
+    const retries = Math.max(10, Math.min(keys.length, 30));
 
     for (let i = 0; i < retries; i++) {
       const key = getHealthyKey(keys);
@@ -79,7 +82,7 @@ export default async function handler(req, res) {
         return;
       } catch (err) {
         const errMsg = err.name === 'AbortError' ? 'Request timed out (50s)' : err.message;
-        console.error(`[AI Backend Rotator] Attempt ${i+1} failed with key ...${key.slice(-6)}:`, errMsg);
+        console.error(`[AI Backend Rotator] Attempt ${i+1}/${retries} failed with key ...${key.slice(-6)}:`, errMsg);
         lastError = err.name === 'AbortError' ? new Error(errMsg) : err;
         
         if (err.name === 'AbortError' || err.message.includes('429') || err.message.includes('401') || err.message.includes('403') || err.message.includes('Limit')) {

@@ -20,7 +20,8 @@ export class ErrorBoundary extends React.Component {
 
   handleReset = () => {
     if (window.confirm('Reset local state? This clears cached interface state to resolve corrupt values but keeps cloud documents.')) {
-      localStorage.removeItem('los_v4');
+      localStorage.removeItem('los_v5');
+      localStorage.removeItem('los_v5_meta');
       localStorage.removeItem('los_active_note_id');
       localStorage.removeItem('los_show_note_editor');
       localStorage.removeItem('los_note_draft');

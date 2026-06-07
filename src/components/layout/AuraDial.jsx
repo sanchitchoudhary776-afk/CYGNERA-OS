@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '@context/AppContext';
 import { auraChat, AI } from '@services/ai';
 import toast from 'react-hot-toast';
+import { triggerHaptic } from '../../utils/haptics.js';
 
 const NAV = [
   { to: '/dashboard', icon: 'space_dashboard', label: 'Dashboard', color: 'var(--p)' },
@@ -29,14 +30,6 @@ const MOBILE_CONSTELLATION = [
   { x: 100, y: 120 },
   { x: 0, y: 200 }
 ];
-
-const triggerTouchHaptic = (dur = 15) => {
-  if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    try {
-      navigator.vibrate(dur);
-    } catch (e) {}
-  }
-};
 
 /* ── Optimized OrbitItem — Pure CSS Transitions (zero framer-motion) ── */
 const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, onClick, isOpen }) => {
@@ -75,8 +68,11 @@ const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, 
             : 'translate3d(0, 0, 0) scale(0)',
           opacity: isOpen ? 1 : 0,
           transition: isOpen
-            ? 'transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease'
-            : 'transform 200ms cubic-bezier(0.4, 0, 0.2, 1), opacity 140ms ease',
+            ? 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 240ms ease'
+            : 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1), opacity 160ms ease',
+          transitionDelay: isOpen
+            ? `${index * 22}ms`
+            : `${(NAV.length - 1 - index) * 12}ms`,
           pointerEvents: isOpen ? 'auto' : 'none',
         }}
       >
@@ -87,7 +83,7 @@ const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, 
             state={item.state}
             className={({ isActive }) => `${isActive && (!item.state || location.state?.tab === item.state.tab) ? 'active' : ''}`}
             onClick={(e) => {
-              triggerTouchHaptic(12);
+              triggerHaptic('light');
               onClick?.(e);
             }}
             style={{
@@ -181,7 +177,7 @@ function AuraDial() {
 
   const handleChat = useCallback(async (e) => {
     e?.preventDefault();
-    triggerTouchHaptic(15);
+    triggerHaptic('medium');
     if (!chatMsg.trim() || isTyping) return;
     if (!AI.enabled()) { toast('Enable Smart Hub in Settings first ✦', { icon: '🔑' }); return; }
 
@@ -436,7 +432,7 @@ function AuraDial() {
 
   const handleHubClick = useCallback((e) => {
     e.stopPropagation();
-    triggerTouchHaptic(15);
+    triggerHaptic('medium');
     setIsOpen(prev => !prev);
   }, []);
 
@@ -554,7 +550,7 @@ function AuraDial() {
 
             {/* Chat Trigger */}
             <button
-              onClick={(e) => { e.stopPropagation(); triggerTouchHaptic(15); setShowChat(true); setIsOpen(false); }}
+              onClick={(e) => { e.stopPropagation(); triggerHaptic('medium'); setShowChat(true); setIsOpen(false); }}
               style={{
                 position: 'absolute',
                 left: -60,
@@ -609,7 +605,7 @@ function AuraDial() {
                 <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--p)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Smart Hub</p>
                 <h3 style={{ fontSize: 15, fontWeight: 800, color: 'var(--t1)', letterSpacing: '-0.02em' }}>How can I help you today?</h3>
               </div>
-              <button onClick={() => { triggerTouchHaptic(10); setShowChat(false); }} className="icon-btn"><span className="material-symbols-outlined">close</span></button>
+              <button onClick={() => { triggerHaptic('light'); setShowChat(false); }} className="icon-btn"><span className="material-symbols-outlined">close</span></button>
             </div>
 
             {/* Chat Body */}
@@ -657,7 +653,7 @@ function AuraDial() {
                 onChange={e => setChatMsg(e.target.value)}
                 autoFocus
               />
-              <button type="submit" onClick={() => triggerTouchHaptic(12)} disabled={!chatMsg.trim() || isTyping} className="btn btn-primary" style={{ width: 44, height: 44, borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <button type="submit" onClick={() => triggerHaptic('light')} disabled={!chatMsg.trim() || isTyping} className="btn btn-primary" style={{ width: 44, height: 44, borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>send</span>
               </button>
             </form>

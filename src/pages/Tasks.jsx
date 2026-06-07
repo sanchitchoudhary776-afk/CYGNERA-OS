@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp }   from '@context/AppContext';
 import { useNetwork } from '@context/NetworkContext';
 import { breakTask } from '@services/ai';
@@ -7,6 +7,7 @@ import { SUBJECT_COLORS, SUBJECTS, PRIORITY, daysUntil } from '@utils';
 import toast from 'react-hot-toast';
 import { usePremium } from '@components/ui/PremiumUI';
 import { Portal } from '@components/ui';
+import { triggerHaptic } from '../utils/haptics.js';
 
 const PC = {
   high:   { c:'#ff4e4e', bg:'rgba(255,78,78,0.06)', border:'rgba(255,78,78,0.2)', label:'Urgent' },
@@ -23,8 +24,71 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
   const [going, setGoing] = useState(false);
   const done = task.status === 'completed';
 
+  // Swipe gesture hooks & state
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const touchStart = useRef({ x: 0, y: 0, hapticTriggered: false });
+  const touchDelta = useRef({ x: 0, y: 0 });
+  const isHorizontalSwipe = useRef(false);
+
+  const handleTouchStart = (e) => {
+    if (done) return;
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY, hapticTriggered: false };
+    touchDelta.current = { x: 0, y: 0 };
+    isHorizontalSwipe.current = false;
+    setSwiping(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!swiping || done) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStart.current.x;
+    const dy = t.clientY - touchStart.current.y;
+    touchDelta.current = { x: dx, y: dy };
+
+    if (!isHorizontalSwipe.current) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+        isHorizontalSwipe.current = true;
+      } else if (Math.abs(dy) > 8) {
+        setSwiping(false);
+        return;
+      }
+    }
+
+    if (isHorizontalSwipe.current) {
+      if (e.cancelable) e.preventDefault();
+      // Allow positive swipe (rightwards) with rubber banding for negative swipes
+      const offset = dx > 0 ? dx : dx * 0.3;
+      setSwipeOffset(offset);
+
+      // Trigger a middle physical haptic tick to alert completion threshold
+      if (dx > 120 && !touchStart.current.hapticTriggered) {
+        triggerHaptic('medium');
+        touchStart.current.hapticTriggered = true;
+      } else if (dx <= 120 && touchStart.current.hapticTriggered) {
+        touchStart.current.hapticTriggered = false;
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!swiping || done) return;
+    setSwiping(false);
+
+    if (isHorizontalSwipe.current && touchDelta.current.x > 120) {
+      setSwipeOffset(window.innerWidth);
+      triggerHaptic('success');
+      setGoing(true);
+      setTimeout(() => onComplete(task.id), 250);
+    } else {
+      setSwipeOffset(0);
+    }
+  };
+
   const handleDone = (e) => { 
     if (done) return;
+    triggerHaptic('success');
     const rect = e.currentTarget.getBoundingClientRect();
     triggerConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2);
     setGoing(true); 
@@ -33,6 +97,9 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
 
   return (
     <div className={`card fadeup d${(index%6)+1}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       style={{ 
         position: 'relative',
         padding: '20px', 
@@ -40,18 +107,47 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
         border: `1px solid ${done ? 'transparent' : 'var(--surface-b)'}`,
         borderLeft: `4px solid ${p.c}`,
         opacity: going ? 0 : 1, 
-        transform: going ? 'scale(0.95) translateX(10px)' : 'none', 
-        transition: 'all 400ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: going 
+          ? 'scale(0.95) translateX(10px)' 
+          : `translate3d(${swipeOffset}px, 0, 0)`, 
+        transition: swiping ? 'none' : 'transform 260ms cubic-bezier(0.25, 0.8, 0.25, 1), opacity 350ms ease',
         display: 'flex',
         flexDirection: 'column',
         gap: 16,
-        overflow: 'hidden'
+        overflow: 'hidden',
+        touchAction: 'pan-y',
+        userSelect: 'none'
       }}>
       
+      {/* Swipe Action Background Indicator */}
+      {swipeOffset > 0 && !done && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(90deg, rgba(9, 205, 131, 0.18) 0%, transparent 80%)',
+          display: 'flex',
+          alignItems: 'center',
+          paddingLeft: 24,
+          borderRadius: 'inherit',
+          pointerEvents: 'none',
+          opacity: Math.min(1, swipeOffset / 100),
+          zIndex: 1
+        }}>
+          <span className="material-symbols-outlined" style={{
+            color: 'var(--p)',
+            fontSize: 26,
+            transform: `scale(${Math.min(1.4, 0.7 + swipeOffset / 180)})`,
+            transition: 'transform 100ms ease'
+          }}>
+            check_circle
+          </span>
+        </div>
+      )}
+
       {/* Priority Glow Background */}
       {!done && <div style={{ position:'absolute', top:0, right:0, width:100, height:100, background:`radial-gradient(circle at top right, ${p.c}15, transparent 70%)`, pointerEvents:'none' }} />}
-
-      <div style={{ display:'flex', alignItems:'flex-start', gap:14 }}>
+ 
+      <div style={{ display:'flex', alignItems:'flex-start', gap:14, zIndex: 2 }}>
         <button 
           onClick={handleDone} 
           disabled={done}
@@ -66,7 +162,7 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
           }}>
           {done && <span className="material-symbols-outlined" style={{ fontSize:15, color:'#fff', fontVariationSettings:"'FILL' 1" }}>check</span>}
         </button>
-
+ 
         <div style={{ flex:1, minWidth:0 }}>
           <div style={{ display:'flex', justifyContent:'space-between', gap:12, marginBottom:4 }}>
             <h3 style={{ 
@@ -78,15 +174,25 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
             
             <div style={{ display:'flex', gap:6, flexShrink:0 }}>
               {done ? (
-                <button onClick={() => onRestore(task.id)} className="icon-btn" style={{ width:28, height:28, background:'rgba(9,205,131,0.1)' }} title="Restore to Active">
+                <button onClick={() => { triggerHaptic('medium'); onRestore(task.id); }} className="icon-btn" style={{ width:28, height:28, background:'rgba(9,205,131,0.1)' }} title="Restore to Active">
                   <span className="material-symbols-outlined" style={{ fontSize:15, color:'var(--p)' }}>settings_backup_restore</span>
                 </button>
               ) : (
                 <>
-                  <button onClick={()=>onEdit(task)} className="icon-btn" style={{ width:28, height:28, background:'var(--s3)' }}>
+                  <button onClick={() => { triggerHaptic('medium'); onEdit(task); }} className="icon-btn" style={{ width:28, height:28, background:'var(--s3)' }}>
                     <span className="material-symbols-outlined" style={{ fontSize:14 }}>edit</span>
                   </button>
-                  <button onClick={() => askConfirm('Delete Task', 'Remove this task?').then(ok => ok && onDelete(task.id))} className="icon-btn" style={{ width:28, height:28, background:'var(--s3)' }}>
+                  <button onClick={() => {
+                    triggerHaptic('warning');
+                    askConfirm('Delete Task', 'Remove this task?').then(ok => {
+                      if (ok) {
+                        triggerHaptic('heavy');
+                        onDelete(task.id);
+                      } else {
+                        triggerHaptic('light');
+                      }
+                    });
+                  }} className="icon-btn" style={{ width:28, height:28, background:'var(--s3)' }}>
                     <span className="material-symbols-outlined" style={{ fontSize:14, color:'var(--danger)' }}>delete</span>
                   </button>
                 </>
@@ -192,7 +298,7 @@ function TaskForm({ task, onSave, onClose }) {
               <label className="label">Priority</label>
               <div style={{ display: 'flex', gap: 5 }}>
                 {['high','medium','low'].map(pr=>(
-                  <button key={pr} onClick={()=>setForm(p=>({...p,priority:pr}))} style={{ flex: 1, padding: isMobile ? '8px 2px' : '10px 2px', borderRadius: 'var(--r-md)', border: `1px solid ${form.priority===pr?PC[pr].c+'55':'var(--surface-b)'}`, background: form.priority===pr?PC[pr].bg:'transparent', color: form.priority===pr?PC[pr].c:'var(--t4)', cursor: 'pointer', fontWeight: 700, fontSize: isMobile ? 9.5 : 10.5, transition: 'all 150ms ease' }}>{PC[pr].label}</button>
+                  <button key={pr} onClick={()=>{ triggerHaptic('light'); setForm(p=>({...p,priority:pr})); }} style={{ flex: 1, padding: isMobile ? '8px 2px' : '10px 2px', borderRadius: 'var(--r-md)', border: `1px solid ${form.priority===pr?PC[pr].c+'55':'var(--surface-b)'}`, background: form.priority===pr?PC[pr].bg:'transparent', color: form.priority===pr?PC[pr].c:'var(--t4)', cursor: 'pointer', fontWeight: 700, fontSize: isMobile ? 9.5 : 10.5, transition: 'all 150ms ease' }}>{PC[pr].label}</button>
                 ))}
               </div>
             </div>
@@ -204,7 +310,7 @@ function TaskForm({ task, onSave, onClose }) {
           <div>
             <div className="fadeup" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <label className="label" style={{ margin: 0, flexShrink: 0 }}>Subtasks</label>
-              <button onClick={runAI} disabled={aiLoad} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, border: '1px solid rgba(9,205,131,0.2)', background: 'rgba(9,205,131,0.07)', color: 'var(--p)', fontWeight: 700, fontSize: 11, cursor: 'pointer', opacity: aiLoad?0.6:1, flexShrink: 0, whiteSpace: 'nowrap' }}>
+              <button onClick={() => { triggerHaptic('medium'); runAI(); }} disabled={aiLoad} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 999, border: '1px solid rgba(9,205,131,0.2)', background: 'rgba(9,205,131,0.07)', color: 'var(--p)', fontWeight: 700, fontSize: 11, cursor: 'pointer', opacity: aiLoad?0.6:1, flexShrink: 0, whiteSpace: 'nowrap' }}>
                 {aiLoad?<div className="spinner" style={{ width: 11, height: 11, borderWidth: 2 }}/>:<span className="material-symbols-outlined" style={{ fontSize: 12, fontVariationSettings: "'FILL' 1" }}>auto_awesome</span>}
                 Construct Breakdown
               </button>
@@ -214,8 +320,8 @@ function TaskForm({ task, onSave, onClose }) {
           </div>
         </div>
         <div className="modal-footer" style={{ padding: isMobile ? '10px 14px' : '12px 20px' }}>
-          <button onClick={onClose} className="btn btn-surface" style={{ padding: isMobile ? '8px 16px' : '9px 18px' }}>Cancel</button>
-          <button onClick={()=>{ if(!form.title.trim()){toast.error('Add a title');return;} onSave({...task,...form,subtasks,estimatedMinutes:Number(form.estimatedMinutes)}); }} className="btn btn-primary" style={{ padding: isMobile ? '8px 16px' : '9px 22px', flex: isMobile ? 1 : 'none' }}>Save Task</button>
+          <button onClick={() => { triggerHaptic('light'); onClose(); }} className="btn btn-surface" style={{ padding: isMobile ? '8px 16px' : '9px 18px' }}>Cancel</button>
+          <button onClick={()=>{ if(!form.title.trim()){ triggerHaptic('error'); toast.error('Add a title'); return; } triggerHaptic('success'); onSave({...task,...form,subtasks,estimatedMinutes:Number(form.estimatedMinutes)}); }} className="btn btn-primary" style={{ padding: isMobile ? '8px 16px' : '9px 22px', flex: isMobile ? 1 : 'none' }}>Save Task</button>
         </div>
       </div>
     </div>
@@ -249,7 +355,7 @@ export default function Tasks() {
             </div>
           </div>
         </div>
-        <button onClick={()=>{setEditing({});setShowForm(true);}} className="btn btn-primary" style={{ padding:'12px 24px', borderRadius:16, background:'linear-gradient(135deg, var(--p), #06b6d4)', border:'none', boxShadow:'0 8px 20px rgba(9,205,131,0.2)' }}>
+        <button onClick={()=>{ triggerHaptic('medium'); setEditing({}); setShowForm(true); }} className="btn btn-primary" style={{ padding:'12px 24px', borderRadius:16, background:'linear-gradient(135deg, var(--p), #06b6d4)', border:'none', boxShadow:'0 8px 20px rgba(9,205,131,0.2)' }}>
           <span className="material-symbols-outlined" style={{ fontSize:20 }}>add_task</span>
           Construct Task
         </button>
@@ -262,7 +368,7 @@ export default function Tasks() {
 
       <div className="card fadeup d3" style={{ display:'flex',gap:'var(--gap-xs)',padding:'6px',background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:16,width:'fit-content',maxWidth:'100%',overflowX:'auto' }}>
         {[{id:'pending',label:`Active Pipeline`, icon:'rocket_launch'},{id:'completed',label:`History`, icon:'history'}].map(f=>(
-          <button key={f.id} onClick={()=>setFilter(f.id)} 
+          <button key={f.id} onClick={()=>{ triggerHaptic('light'); setFilter(f.id); }} 
             style={{ 
               display:'flex', alignItems:'center', gap:8,
               padding:'10px 20px',borderRadius:12,border:'none',cursor:'pointer',fontWeight:800,fontSize:13,
@@ -297,7 +403,7 @@ export default function Tasks() {
           <p style={{ fontSize:14,color:'var(--t4)',marginTop:8,maxWidth:280,marginInline:'auto',lineHeight:1.6 }}>{filter==='pending'?'Your academic engine is running at 100% efficiency. Time to refuel?':'Start completing tasks to build your historical study data.'}</p>
         </div>
       )}
-      {showForm&&<Portal><TaskForm task={editing} onSave={task=>{if(task.id){A.task.update(task);toast.success('Task Modified');}else{A.task.add(task);toast.success('Logic Stream Injected ✦');}setShowForm(false);setEditing(null);}} onClose={()=>{setShowForm(false);setEditing(null);}}/></Portal>}
+      {showForm&&<Portal><TaskForm task={editing} onSave={task=>{ triggerHaptic('success'); if(task.id){A.task.update(task);toast.success('Task Modified');}else{A.task.add(task);toast.success('Logic Stream Injected ✦');}setShowForm(false);setEditing(null);}} onClose={()=>{ triggerHaptic('light'); setShowForm(false); setEditing(null);}}/></Portal>}
     </div>
   );
 }

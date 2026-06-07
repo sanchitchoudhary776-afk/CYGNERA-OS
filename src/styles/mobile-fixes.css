@@ -544,3 +544,732 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ═══════════════════════════════════════════
+   PREMIUM TOUCH SCREEN SMOOTHNESS & VISUAL FEEDBACK
+   ═══════════════════════════════════════════ */
+
+/* Apply hardware-accelerated transitions to all interactive elements for dynamic spring-back response */
+button, a, input, select, textarea, [role="button"], .clickable, .alarm-card-hover, .orbit-item, .nav-item {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform, opacity;
+}
+
+/* Hardware-accelerated dynamic tactile press state */
+.touch-active {
+  transform: scale(0.95) translateZ(0) !important;
+  opacity: 0.85 !important;
+  filter: brightness(1.08) !important;
+  transition: transform 70ms cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* Page transitions: Force hardware acceleration to prevent stutters on mobile/tablet */
+.page {
+  will-change: transform, opacity;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Natural momentum scrolling with rubber-band containment */
+#los-main,
+.editor-inner-container,
+[style*="overflowY: auto"],
+[style*="overflow-y: auto"],
+[style*="overflowX: auto"],
+[style*="overflow-x: auto"] {
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+}
+
+/* Disable sticky hover states on touch-only devices */
+@media (hover: none) {
+  button:hover,
+  .btn:hover,
+  .icon-btn:hover,
+  .nav-item:hover,
+  .orbit-item:hover,
+  .card-hover:hover {
+    transform: none !important;
+    box-shadow: inherit !important;
+    background: inherit !important;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   NATIVE PWA APP EXPERIENCE
+   Makes the installed PWA feel like a proper Android/iOS app
+   rather than a website in a browser frame.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 1. Global Native App Behaviors ───────────────────────── */
+
+/* Prevent rubber-band overscroll bounce (the #1 "website" tell) */
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+}
+
+/* Kill the blue/grey tap highlight rectangle on Android Chrome */
+*, *::before, *::after {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent accidental text selection on UI chrome (buttons, labels, nav)
+   while preserving selection in actual content areas */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable text selection on content areas where users expect it */
+input, textarea, [contenteditable="true"],
+.ql-editor, .quill, .note-editor-container,
+pre, code,
+p, span, li, td, th, blockquote,
+h1, h2, h3, h4, h5, h6,
+.page-title,
+[style*="whiteSpace: pre"],
+[style*="white-space: pre"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Ensure buttons/nav/icons remain non-selectable even inside content */
+button, a, nav, [role="button"], .clickable,
+label, .material-symbols-outlined,
+.card-hover, .orbit-item, .nav-item {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Eliminate double-tap zoom delay globally (makes taps feel instant) */
+html {
+  touch-action: manipulation;
+}
+
+/* Prevent iOS text size inflation on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+
+/* ── 2. Standalone PWA Mode (Installed App) ──────────────── */
+/* These rules ONLY activate when the app is installed as a PWA */
+
+@media (display-mode: standalone) {
+
+  /* Status bar safe-area spacing */
+  body {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+
+  /* The scroll progress bar should sit below the status bar notch */
+  [style*="position: fixed"][style*="top: 0"][style*="height: 3"] {
+    top: env(safe-area-inset-top, 0px) !important;
+  }
+
+  /* Remove any remaining browser-like margin/padding on root */
+  html, body, #root {
+    margin: 0 !important;
+    border: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Full immersive height including safe areas */
+  #root {
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Hide scrollbar entirely in standalone mode for native feel */
+  ::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+  }
+
+  * {
+    scrollbar-width: none !important;
+  }
+
+  /* Tighter page padding in standalone (no browser chrome eating space) */
+  .page {
+    padding-top: 8px !important;
+  }
+}
+
+/* iOS standalone detection (apple-mobile-web-app-capable) */
+@media (display-mode: standalone), (-webkit-device-pixel-ratio: 2) and (orientation: portrait) {
+  /* Prevent elastic scroll on the body itself */
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  body {
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+
+
+/* ── 3. Enhanced Touch Scroll Physics ────────────────────── */
+
+/* Only the main content area should scroll, with native momentum */
+#los-main {
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  scroll-behavior: smooth;
+  /* GPU-accelerated scroll container */
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* Prevent horizontal scroll escape on all pages (mobile only — 
+   desktop retains max-width: 1120px centering from globals.css) */
+@media (max-width: 768px) {
+  .page {
+    overflow-x: hidden !important;
+  }
+}
+
+
+/* ── 4. Mobile-Specific Native Refinements ───────────────── */
+
+@media (max-width: 768px) {
+
+  /* Bottom safe-area padding for gesture-nav phones (Android 10+, iOS) */
+  .page {
+    padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Cards should have slightly rounded corners on mobile for app feel */
+  .card {
+    border-radius: 16px !important;
+  }
+
+  /* Hide scrollbars on mobile for cleaner native look */
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0;
+  }
+
+  * {
+    scrollbar-width: none;
+  }
+
+  /* Prevent long-press context menu on interactive elements */
+  button, a, img, [role="button"], .clickable {
+    -webkit-touch-callout: none;
+  }
+
+  /* Input fields should have a slightly larger touch target */
+  input, select, textarea {
+    min-height: 44px;
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+
+  /* Ensure modals/overlays respect safe areas */
+  [style*="position: fixed"] {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ── 5. Tablet Landscape Optimizations ───────────────────── */
+
+@media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) {
+  .page {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  /* Two-column grid for cards on tablets */
+  .card {
+    border-radius: 14px !important;
+  }
+}
+
+/* ── 6. Dark Status Bar Integration ──────────────────────── */
+/* Seamless blending of the app with the device status bar */
+
+@media (display-mode: standalone) {
+  /* The header/aura bar blends into the status bar */
+  [style*="position: sticky"][style*="top: 0"],
+  [style*="position: fixed"][style*="top: 0"] {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
+}
+
+/* ── 7. Native-Like Transitions ──────────────────────────── */
+
+/* Page content transitions feel app-like with subtle slide */
+.page {
+  animation: nativeFadeIn 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+@keyframes nativeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) translateZ(0);
+  }
+}
+
+/* Smooth sheet-style card entrances */
+.card {
+  animation: cardSlideUp 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes cardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE COMPREHENSIVE OVERHAUL v2
+   All rules STRICTLY inside max-width:768px — desktop UNTOUCHED.
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ── 1. GLOBAL LAYOUT SAFETY ──────────────────────────── */
+
+  /* Full-width page with no horizontal overflow */
+  .page {
+    width: 100% !important;
+    max-width: 100vw !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Prevent ANY child from exceeding viewport */
+  .page > * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* App header: compact on mobile */
+  .app-header {
+    padding: 0 12px !important;
+    height: 52px !important;
+  }
+
+
+  /* ── 2. DASHBOARD PAGE ────────────────────────────────── */
+
+  /* Hero card: stack vertically, no side overflow */
+  .mastery-progress-card {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+    gap: 16px !important;
+  }
+
+  .mastery-progress-card > div {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Spheres grid: 2x2 always fits */
+  .spheres-grid-container {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Sphere items: smaller on mobile */
+  .sphere-wrapper {
+    max-width: 100% !important;
+  }
+
+  /* Quick actions grid: 2x2 instead of 4 columns */
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Activity chart card: full width, reduced padding */
+  .activity-chart-card {
+    padding: 14px !important;
+  }
+
+  .activity-chart-card .card-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  /* Dashboard header actions row */
+  .dashboard-header-actions {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .dashboard-header-actions > * {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+
+  /* ── 3. FOCUS TIMER PAGE ──────────────────────────────── */
+
+  /* Timer dial container: ensure centered, not cut */
+  .dial-center {
+    transform: translate(-50%, -50%) !important;
+  }
+
+  .dial-recess {
+    inset: 28px !important;
+  }
+
+  /* Timer controls: wrap nicely */
+  div[style*="gap: 16"][style*="alignItems: center"] {
+    gap: 10px !important;
+  }
+
+  /* Soundscape section: full width */
+  div[style*="maxWidth: 420"] {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Session history grid: single column */
+  div[style*="gridTemplateColumns: 1fr 1fr"][style*="gap: 24"] {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+
+  /* ── 4. NETWORK PAGE ──────────────────────────────────── */
+
+  /* Network container: full width */
+  .network-container {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+  }
+
+  /* Network tabs: horizontal scroll, no wrap */
+  .network-tabs {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    flex-wrap: nowrap !important;
+  }
+
+  .network-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .network-tabs button {
+    min-width: 90px !important;
+    flex-shrink: 0 !important;
+    padding: 8px 12px !important;
+    font-size: 12px !important;
+  }
+
+  /* Network podium grid: stack on mobile */
+  .network-podium-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* Network header: stack vertically */
+  .network-container > div:first-child > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Network profile modal: bottom sheet style */
+  div[style*="zIndex: 200"] > div[style*="maxWidth: 440"],
+  div[style*="zIndex:200"] > div[style*="maxWidth:440"] {
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 85dvh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Network leaderboard cards: tighter */
+  .network-container .card[style*="padding:14px 18px"],
+  .network-container .card[style*="padding: 14px 18px"] {
+    padding: 10px 12px !important;
+  }
+
+  /* Network search input */
+  .network-container input[style*="padding: 13px"] {
+    padding: 11px 14px 11px 40px !important;
+    font-size: 14px !important;
+  }
+
+
+  /* ── 5. TASKS PAGE ────────────────────────────────────── */
+
+  /* Task cards: single column */
+  [style*="gridTemplateColumns: repeat(auto-fill, minmax(min(100%, 360px)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Task filter tabs: scrollable */
+  .card[style*="width: fit-content"][style*="overflowX: auto"],
+  .card[style*="width:'fit-content'"][style*="overflowX"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Task header: stack */
+  .page > .fadeup:first-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .page > .fadeup:first-child > .btn {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+
+  /* ── 6. SCHEDULE PAGE ─────────────────────────────────── */
+
+  /* Schedule header: stack buttons */
+  .page > div:first-child > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  /* Calendar/Schedule grids: prevent overflow */
+  .card table {
+    font-size: 11px !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    display: block !important;
+  }
+
+
+  /* ── 7. NOTES PAGE ────────────────────────────────────── */
+
+  /* Note editor inner container */
+  .editor-inner-container {
+    padding: 16px 12px !important;
+    max-width: 100% !important;
+  }
+
+  /* Note title input */
+  .editor-title-input {
+    font-size: 22px !important;
+  }
+
+  /* Notes grid/list: single column */
+  [style*="gridTemplateColumns: repeat(auto-fill,minmax(280px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+
+  /* ── 8. SETTINGS PAGE ─────────────────────────────────── */
+
+  /* Settings grid: single column */
+  .settings-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .settings-col-left,
+  .settings-col-right {
+    grid-column: span 1 !important;
+    gap: 14px !important;
+  }
+
+  /* Settings cards: reduce padding */
+  .settings-grid .card {
+    padding: 14px 12px !important;
+  }
+
+
+  /* ── 9. PROGRESS PAGE ─────────────────────────────────── */
+
+  /* Biometric grid: 2 columns */
+  .card [style*="gridTemplateColumns: repeat(auto-fit, minmax(130px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Strengths grid: single column */
+  .card [style*="gridTemplateColumns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+
+  /* ── 10. LEARNING PATHS PAGE ──────────────────────────── */
+
+  /* Path cards: single column */
+  [style*="gridTemplateColumns: repeat(auto-fill,minmax(300px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+
+  /* ── 11. VIDEOS PAGE ──────────────────────────────────── */
+
+  /* Video studio modal: stack vertically */
+  .video-studio-modal {
+    flex-direction: column !important;
+    max-height: 90dvh !important;
+    width: calc(100vw - 16px) !important;
+  }
+
+  .video-studio-sidebar {
+    width: 100% !important;
+    max-height: 35vh !important;
+    border-left: none !important;
+    border-top: 1px solid var(--surface-b) !important;
+  }
+
+
+  /* ── 12. ALL MODALS & OVERLAYS ────────────────────────── */
+
+  /* Generic modals: full width with margin */
+  .modal,
+  div[style*="maxWidth: 500"],
+  div[style*="maxWidth: 520"],
+  div[style*="maxWidth: 560"],
+  div[style*="maxWidth: 600"],
+  div[style*="maxWidth:500"],
+  div[style*="maxWidth:520"] {
+    max-width: calc(100vw - 24px) !important;
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+  }
+
+  /* Small modals: ensure they fit */
+  div[style*="maxWidth: 420"],
+  div[style*="maxWidth:420"],
+  div[style*="maxWidth: 440"],
+  div[style*="maxWidth:440"] {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Modal overlay: bottom-align on mobile for sheet effect */
+  div[style*="position: fixed"][style*="alignItems: center"][style*="justifyContent: center"] {
+    padding: 12px !important;
+  }
+
+  /* Session/Break complete modals */
+  div[style*="zIndex: 100000"] > div {
+    max-width: calc(100vw - 32px) !important;
+    padding: 20px !important;
+  }
+
+
+  /* ── 13. FLEX/GRID OVERFLOW PREVENTION ────────────────── */
+
+  /* Any inline flex with gap that might overflow */
+  [style*="display: flex"][style*="gap:"] {
+    max-width: 100% !important;
+  }
+
+  /* Flex rows: allow wrapping */
+  [style*="display: flex"][style*="alignItems: center"] {
+    flex-wrap: wrap;
+  }
+
+  /* Prevent fixed-width elements from overflowing */
+  [style*="width: 100%"] {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* All grid containers: clamp to viewport */
+  [style*="display: grid"] {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+
+  /* ── 14. TYPOGRAPHY MOBILE REFINEMENTS ─────────────────── */
+
+  /* Prevent long words from overflowing cards */
+  .card p, .card span, .card h2, .card h3, .card h4 {
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+
+  /* Stat values: slightly smaller on mobile */
+  .card p[style*="fontSize: 20"],
+  .card p[style*="fontSize:20"] {
+    font-size: 16px !important;
+  }
+
+  .card p[style*="fontSize: 18"],
+  .card p[style*="fontSize:18"] {
+    font-size: 15px !important;
+  }
+
+
+  /* ── 15. BUTTON & INPUT TOUCH TARGETS ─────────────────── */
+
+  /* Ensure minimum 44px touch targets */
+  .btn, button:not(.icon-btn) {
+    min-height: 40px !important;
+  }
+
+  /* Select dropdowns: full width on mobile */
+  select {
+    max-width: 100% !important;
+  }
+
+  /* Inputs: prevent iOS zoom (16px minimum) */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+
+/* ── Tablet Portrait (769px - 1024px) ─────────────────── */
+@media (min-width: 769px) and (max-width: 1024px) {
+
+  /* Tablet: slightly narrower page */
+  .page {
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  /* Quick actions: 4 columns OK on tablet */
+  .grid-4 {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+
+  /* Network: wider on tablet */
+  .network-container {
+    max-width: 100% !important;
+  }
+
+  /* Settings grid: 1 column on portrait tablet */
+  .settings-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+

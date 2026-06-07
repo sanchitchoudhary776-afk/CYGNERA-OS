@@ -169,23 +169,45 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
         }
 
         /* ── App process killer (runs every 2.5s) ── 
-         *  Uses native 'tasklist' instead of PowerShell — completely silent,
-         *  no console windows, no permission prompts.
+         *  Uses native verbose 'tasklist' with STATUS eq Running.
+         *  Completely silent, no console windows, no permission prompts.
          * ──────────────────────────────────────────── */
-        function parseTasklistCSV(stdout) {
+        function parseVerboseTasklistCSV(stdout) {
           const procs = [];
           if (!stdout) return procs;
           for (const line of stdout.split('\n')) {
             const t = line.trim();
-            if (!t || t.startsWith('"Image Name"')) continue; // skip header
-            // CSV format: "name.exe","PID","Session","#","Mem"
-            const m = t.match(/^"([^"]+)","(\d+)"/);
-            if (m) procs.push({ ProcessName: m[1].replace(/\.exe$/i, ''), Id: parseInt(m[2], 10) });
+            if (!t) continue;
+            // Robust CSV parsing that respects quotes
+            const fields = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < t.length; i++) {
+              const c = t[i];
+              if (c === '"') {
+                inQuotes = !inQuotes;
+              } else if (c === ',' && !inQuotes) {
+                fields.push(current.trim());
+                current = '';
+              } else {
+                current += c;
+              }
+            }
+            if (current) fields.push(current.trim());
+
+            if (fields.length >= 9) {
+              const name = fields[0].replace(/\.exe$/i, '');
+              const pid = parseInt(fields[1], 10);
+              const title = fields[8];
+              procs.push({ ProcessName: name, Id: pid, MainWindowTitle: title });
+            }
           }
           return procs;
         }
 
+        const lastNotifiedApps = {};
         let isRunningCheck = false;
+
         const checkInterval = setInterval(async () => {
           if (!blockerState.enabled) return;
           if (!blockerState.blockedApps || blockerState.blockedApps.length === 0) return;
@@ -193,29 +215,48 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
           isRunningCheck = true;
 
           try {
-            // Native tasklist — no PowerShell, fully silent, no permission prompts
-            const { stdout } = await execPromise('tasklist /FO CSV /NH', { timeout: 8000, windowsHide: true });
+            // Native verbose tasklist for active processes only
+            const { stdout } = await execPromise('tasklist /V /FO CSV /NH /FI "STATUS eq Running"', { timeout: 8000, windowsHide: true });
             if (!stdout || !stdout.trim()) return;
 
-            const processes = parseTasklistCSV(stdout);
+            const processes = parseVerboseTasklistCSV(stdout);
             const blockedSet = new Set(
               blockerState.blockedApps.map(b => b.replace(/\.exe$/i, '').toLowerCase().trim())
             );
+
+            const terminatedAppsThisTick = new Set();
 
             for (const proc of processes) {
               if (!proc || !proc.ProcessName) continue;
               const name = proc.ProcessName.toLowerCase();
 
               if (blockedSet.has(name)) {
-                console.log(`[App Blocker] ✗ Blocked app detected: ${proc.ProcessName} (PID ${proc.Id}). Terminating...`);
-                try {
-                  await execPromise(`taskkill /F /PID ${proc.Id}`, { timeout: 5000, windowsHide: true });
-                } catch {}
+                // Only block/notify if it has a valid active window title (so tray/background helpers don't trigger alerts)
+                const title = proc.MainWindowTitle || '';
+                if (title && title !== 'N/A') {
+                  console.log(`[App Blocker] ✗ Blocked GUI app detected: ${proc.ProcessName} ("${title}", PID ${proc.Id}). Terminating...`);
+                  try {
+                    await execPromise(`taskkill /F /PID ${proc.Id}`, { timeout: 5000, windowsHide: true });
+                  } catch {}
+                  terminatedAppsThisTick.add(proc.ProcessName);
+                }
+              }
+            }
+
+            // Trigger VBScript notifications with 15-second cooldown
+            const nowTime = Date.now();
+            for (const appName of terminatedAppsThisTick) {
+              const lowerName = appName.toLowerCase();
+              const lastTime = lastNotifiedApps[lowerName] || 0;
+              if (nowTime - lastTime > 15000) {
+                lastNotifiedApps[lowerName] = nowTime;
 
                 // Show notification via VBScript — NO console window at all
-                const safeAppName = proc.ProcessName.replace(/"/g, '""');
+                const safeAppName = appName.replace(/"/g, '""');
                 const vbsContent = `MsgBox "ACCESS DENIED!" & vbCrLf & vbCrLf & "${safeAppName} is blocked by Axinite OS Focus Shield." & vbCrLf & "Close this dialog and get back to your learning goals!", vbExclamation, "Axinite OS - Focus Shield"`;
-                const vbsPath = path.join(ROOT, '.axinite-popup.vbs');
+                const sanitizedFileName = lowerName.replace(/[^a-z0-9]/g, '');
+                const vbsPath = path.join(ROOT, `.axinite-popup-${sanitizedFileName}.vbs`);
+
                 try {
                   fs.writeFileSync(vbsPath, vbsContent, 'utf8');
                   exec(`wscript.exe "${vbsPath}"`, { windowsHide: true }, () => {
@@ -342,9 +383,10 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
                   res.end(JSON.stringify({ error: { message: 'GROQ_API_KEY is not set in your local .env file. Add it and restart the dev server.' } }));
                   return;
                 }
-                const keys = envKey.split(',').map(k => k.trim()).filter(Boolean);
+                const cleanEnvKey = envKey.replace(/['"]/g, '').trim();
+                const keys = cleanEnvKey.split(',').map(k => k.trim()).filter(Boolean);
                 let lastError = null;
-                const retries = Math.min(5, keys.length * 2);
+                const retries = Math.max(10, Math.min(keys.length, 30));
 
                 for (let i = 0; i < retries; i++) {
                   const now = Date.now();
@@ -378,7 +420,7 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
                     return;
                   } catch (err) {
                     const errMsg = err.name === 'AbortError' ? 'Request timed out (50s)' : err.message;
-                    console.error(`[AI Dev Rotator] Attempt ${i+1} failed with key ...${key.slice(-6)}:`, errMsg);
+                    console.error(`[AI Dev Rotator] Attempt ${i+1}/${retries} failed with key ...${key.slice(-6)}:`, errMsg);
                     lastError = err.name === 'AbortError' ? new Error(errMsg) : err;
                     
                     if (err.name === 'AbortError' || err.message.includes('429') || err.message.includes('401') || err.message.includes('403') || err.message.includes('Limit')) {

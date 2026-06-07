@@ -339,7 +339,7 @@ function DetailModal({ ach, onClose }) {
     }
     if (!AI.enabled()) return;
     setLoading(true);
-    achievementMsg(title, { earnedAt }).then(r => { if (r) setMsg(r); }).finally(() => setLoading(false));
+    achievementMsg(title, { earnedAt }).then(r => { if (r) setMsg(r); }).catch(() => {}).finally(() => setLoading(false));
   }, [title]);
 
   return (

@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Reveal } from '@components/ui/PremiumUI';
 import { Portal } from '@components/ui';
-import { USERS, getStore, updateStore } from './NetworkData';
+import { buildUsersList, getStore, updateStore } from './NetworkData';
+import { useAuth } from '@context/AuthContext';
+import { useApp } from '@context/AppContext';
 import NetworkFeed from './NetworkFeed';
 import NetworkMessages from './NetworkMessages';
 import NetworkCommunities from './NetworkCommunities';
@@ -15,11 +17,16 @@ const TABS = [
 ];
 
 export default function Network() {
+  const { user } = useAuth();
+  const { progress } = useApp();
   const [tab, setTab] = useState('leaderboard');
   const [store, setStore] = useState(getStore);
   const [search, setSearch] = useState('');
   const [profile, setProfile] = useState(null);
   const refresh = () => setStore(getStore());
+
+  // Dynamically build the users list with the current user merged in
+  const USERS = useMemo(() => buildUsersList(user, progress), [user, progress]);
 
   const isFollowing = (id) => store.following.includes(id);
   const toggleFollow = (id) => {
@@ -228,7 +235,7 @@ export default function Network() {
   const msgCount = Object.values(store.dms).reduce((a, m) => a + m.length, 0);
 
   return (
-    <div className="network-container" style={{ width: '100%', maxWidth: 'min(100%, 840px)', margin: '0 auto' }}>
+    <div className="network-container" style={{ width: '100%', maxWidth: 'min(100%, 1120px)', margin: '0 auto' }}>
       <style>{`
         @keyframes modalFadeIn{from{opacity:0}to{opacity:1}}
         @keyframes modalCenterIn{from{opacity:0;transform:scale(0.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}

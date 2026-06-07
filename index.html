@@ -3,9 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="description" content="AXINITE OS — The AI-powered study platform that adapts to you" />
     <meta name="theme-color" content="#09cd83" />
+
+    <!-- Apple PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Axinite" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>AXINITE OS</title>
 
     <!-- Fonts -->
@@ -17,9 +25,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
 
     <style>
-      /* Critical: prevent flash of unstyled content */
-      html { background: #0e1510; }
-      body { margin: 0; font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif; }
+      /* Critical: prevent flash of unstyled content + native app baseline */
+      html {
+        background: #0e1510;
+        overscroll-behavior: none;
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        font-family: 'Inter', 'Plus Jakarta Sans', system-ui, sans-serif;
+        overscroll-behavior-y: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        touch-action: manipulation;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
+      }
       #root { min-height: 100dvh; }
       .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 200, 'opsz' 24;

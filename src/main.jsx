@@ -4,16 +4,18 @@ import App from './App.jsx';
 import './styles/globals.css';
 import './styles/mobile-fixes.css';
 
-// ── Register Alarm Service Worker ────────────────────────────────
-// This SW runs in background and fires native OS notifications for alarms
-// even when the tab is not focused or is minimized.
+import { initGlobalHaptics } from './utils/haptics.js';
+
+// ── Register Service Workers ─────────────────────────────────
+// PWA SW: Handles offline caching and instant app-shell loading
+// Alarm SW: Handles background alarm notifications
 try {
   if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-    // First unregister any STALE service workers (old PWA etc.)
+    // First unregister any STALE service workers (old ones that aren't ours)
     navigator.serviceWorker.getRegistrations().then(registrations => {
       registrations.forEach(reg => {
-        // Only unregister non-alarm SWs
-        if (reg.active && !reg.active.scriptURL.includes('alarm-sw.js')) {
+        const url = reg.active?.scriptURL || '';
+        if (url && !url.includes('alarm-sw.js') && !url.includes('sw.js')) {
           reg.unregister().then(ok => {
             if (ok) console.log('[SW] Unregistered stale service worker');
           });
@@ -21,10 +23,19 @@ try {
       });
     });
 
-    // Register our alarm service worker
-    navigator.serviceWorker.register('/alarm-sw.js', { scope: '/' })
+    // Register the PWA service worker (offline caching + instant load)
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(registration => {
-        console.log('[Alarm SW] Registered successfully. Scope:', registration.scope);
+        console.log('[PWA SW] Registered. Scope:', registration.scope);
+      })
+      .catch(err => {
+        console.warn('[PWA SW] Registration failed (non-critical):', err.message);
+      });
+
+    // Register the alarm service worker (background notifications)
+    navigator.serviceWorker.register('/alarm-sw.js', { scope: '/alarm' })
+      .then(registration => {
+        console.log('[Alarm SW] Registered. Scope:', registration.scope);
       })
       .catch(err => {
         console.warn('[Alarm SW] Registration failed (non-critical):', err.message);
@@ -53,30 +64,37 @@ try {
 
 // ── Global Premium Touch Screen Haptic Feedback ──────────────────
 try {
-  if (typeof window !== 'undefined') {
-    const triggerGlobalTouchHaptic = (dur = 12) => {
-      if (navigator.vibrate) {
-        try {
-          navigator.vibrate(dur);
-        } catch (err) {}
-      }
-    };
-
-    window.addEventListener('touchstart', (e) => {
-      const target = e.target;
-      if (!target) return;
-      
-      const isInteractive = target.closest(
-        'button, a, input, select, textarea, [role="button"], [onClick], .clickable, .alarm-card-hover, .orbit-item, [onclick]'
-      );
-      
-      if (isInteractive) {
-        triggerGlobalTouchHaptic(12);
-      }
-    }, { passive: true });
-  }
+  initGlobalHaptics();
 } catch (e) {
   console.warn('Global touch haptics init failed (non-critical):', e);
+}
+
+// ── Global Crash-Proof Error Handlers ────────────────────────────
+// These prevent unhandled errors from silently killing the app
+try {
+  // Catch unhandled promise rejections (e.g. failed API calls, Supabase timeouts)
+  window.addEventListener('unhandledrejection', (event) => {
+    event.preventDefault(); // Prevent default browser error logging
+    const reason = event.reason;
+    const msg = reason?.message || reason?.toString?.() || 'Unknown async error';
+    console.error('[AXINITE OS] Unhandled Promise Rejection:', msg, reason);
+    // Avoid spamming the user — only show critical non-network errors
+    if (!msg.includes('fetch') && !msg.includes('network') && !msg.includes('Failed to fetch') && !msg.includes('AbortError')) {
+      // Silently log — the ErrorBoundary or try/catch in services handle the real UI
+    }
+  });
+
+  // Catch completely uncaught synchronous errors
+  window.addEventListener('error', (event) => {
+    // Suppress harmless ResizeObserver loop errors (browser quirk, not a real bug)
+    if (event.message?.includes?.('ResizeObserver loop')) {
+      event.stopImmediatePropagation();
+      return;
+    }
+    console.error('[AXINITE OS] Uncaught Error:', event.message, event.filename, event.lineno);
+  });
+} catch (e) {
+  // Even the error handlers themselves are wrapped — truly crash-proof
 }
 
 // Force clear all legacy/testing data to ensure a completely clean start

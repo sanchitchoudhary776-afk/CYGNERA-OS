@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "blockedApps": [
+    "Discord",
+    "Spotify",
+    "Steam"
+  ],
+  "blockedSites": [
+    "instagram.com",
+    "youtube.com",
+    "twitter.com",
+    "tiktok.com",
+    "facebook.com",
+    "reddit.com",
+    "snapchat.com"
+  ]
+}
