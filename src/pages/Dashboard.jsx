@@ -10,6 +10,7 @@ import { AI } from '@services/ai';
 import { PersonalizationEngine } from '@services/personalization';
 import { fmt, daysUntil, SUBJECT_COLORS } from '@utils';
 import { usePremium, Counter, Reveal } from '@components/ui/PremiumUI';
+import { useIsMobile } from '@utils/platform';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -18,7 +19,7 @@ function greeting(userName) {
 }
 
 // ── Circular Progress Ring ────────────────────
-function RingProgress({ pct = 0, size = 160, stroke = 10, color = 'var(--p)', label = '', sublabel = '' }) {
+const RingProgress = memo(function RingProgress({ pct = 0, size = 160, stroke = 10, color = 'var(--p)', label = '', sublabel = '' }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (Math.min(pct, 100) / 100) * c;
@@ -38,9 +39,9 @@ function RingProgress({ pct = 0, size = 160, stroke = 10, color = 'var(--p)', la
       </div>
     </div>
   );
-}
+});
 
-function ActivityBars({ data, total, compact = false }) {
+const ActivityBars = memo(function ActivityBars({ data, total, compact = false }) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const chartRef = useRef(null);
   const { theme } = useTheme();
@@ -230,10 +231,10 @@ function ActivityBars({ data, total, compact = false }) {
       </div>
     </div>
   );
-}
+});
 
 // ── Task Row ─────────────────────────────────
-function TaskRow({ task, onComplete }) {
+const TaskRow = memo(function TaskRow({ task, onComplete }) {
   const PCFG = { high: { c: '#ff6b6b', bg: 'rgba(255,107,107,0.08)' }, medium: { c: '#e9cd6e', bg: 'rgba(233,205,110,0.08)' }, low: { c: 'var(--p)', bg: 'rgba(9,205,131,0.08)' } };
   const p = PCFG[task.priority] || PCFG.medium;
   const days = daysUntil(task.deadline);
@@ -272,13 +273,14 @@ function TaskRow({ task, onComplete }) {
       )}
     </div>
   );
-}
+});
 
 // ── AI Briefing (Personalized) ───────────────
-function AIBriefing({ user, progress, tasks, appState }) {
+const AIBriefing = memo(function AIBriefing({ user, progress, tasks, appState }) {
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const fetchedRef = useRef(false);
+  const isMobile = useIsMobile();
   const [isMinimized, setIsMinimized] = useState(() => window.innerWidth < 768);
 
   // Get current mood to use as cache-buster (new mood = new briefing)
@@ -337,19 +339,19 @@ function AIBriefing({ user, progress, tasks, appState }) {
   return (
     <div
       className="fadeup"
-      onClick={() => window.innerWidth < 768 && setIsMinimized(!isMinimized)}
+      onClick={() => isMobile && setIsMinimized(!isMinimized)}
       style={{
         position: 'relative',
-        padding: window.innerWidth < 768 ? '12px 16px' : '20px 24px',
+        padding: isMobile ? '12px 16px' : '20px 24px',
         borderRadius: 'var(--r-xl)',
         background: 'var(--s2)',
         border: '1px solid color-mix(in srgb, var(--p-blue) 25%, transparent)',
         display: 'flex',
         alignItems: 'center',
-        gap: window.innerWidth < 768 ? 12 : 18,
+        gap: isMobile ? 12 : 18,
         boxShadow: 'var(--sh-lg)',
         overflow: 'hidden',
-        cursor: window.innerWidth < 768 ? 'pointer' : 'default',
+        cursor: isMobile ? 'pointer' : 'default',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
       }}
     >
@@ -361,7 +363,7 @@ function AIBriefing({ user, progress, tasks, appState }) {
       }} />
 
       {/* AI Icon with Soft Pulse */}
-      <div style={{ position: 'relative', flexShrink: 0, display: window.innerWidth < 768 && isMinimized ? 'none' : 'block' }}>
+      <div style={{ position: 'relative', flexShrink: 0, display: isMobile && isMinimized ? 'none' : 'block' }}>
         <div style={{
           width: 40, height: 40, borderRadius: 12,
           background: 'color-mix(in srgb, var(--p-blue) 10%, transparent)',
@@ -373,39 +375,15 @@ function AIBriefing({ user, progress, tasks, appState }) {
         </div>
         <div className="ai-pulse-ring" />
       </div>
-      <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1, paddingRight: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: window.innerWidth < 768 && isMinimized ? 0 : 2 }}>
+
+      {/* Text Wrapper with Slide Gap (paddingRight) */}
+      <div style={{ flex: 1, minWidth: 0, position: 'relative', zIndex: 1, paddingRight: isMobile ? '36px' : '48px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile && isMinimized ? 0 : 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <p className="holographic-text" style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.12em' }}>Smart Insights</p>
             <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--p-blue)', opacity: 0.5 }} />
             <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', opacity: 0.5 }}>AURA</span>
           </div>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}
-            style={{
-              position: 'absolute',
-              top: '-10px', // Shift minimizing button further upward
-              right: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(96, 165, 250, 0.08)',
-              border: '1px solid rgba(96, 165, 250, 0.2)',
-              borderRadius: '50%',
-              width: '24px',
-              height: '24px',
-              color: 'var(--p-blue)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              padding: 0,
-              zIndex: 2
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 16, fontWeight: 'bold' }}>
-              {isMinimized ? 'expand_more' : 'expand_less'}
-            </span>
-          </button>
         </div>
 
         {loading ? (
@@ -415,11 +393,11 @@ function AIBriefing({ user, progress, tasks, appState }) {
           </div>
         ) : msg ? (
           <p style={{
-            fontSize: window.innerWidth < 768 ? 12.5 : 14,
+            fontSize: isMobile ? 12.5 : 14,
             color: 'var(--t1)',
             lineHeight: 1.6,
             fontWeight: 500,
-            marginTop: window.innerWidth < 768 && isMinimized ? 4 : 0,
+            marginTop: isMobile && isMinimized ? 4 : 0,
             display: isMinimized ? '-webkit-box' : 'block',
             WebkitLineClamp: isMinimized ? 1 : 'unset',
             WebkitBoxOrient: isMinimized ? 'vertical' : 'unset',
@@ -433,13 +411,40 @@ function AIBriefing({ user, progress, tasks, appState }) {
         )}
       </div>
 
+      {/* Minimize Toggle Icon - Placed outside text container, shifted right relative to the outer card box */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setIsMinimized(!isMinimized); }}
+        style={{
+          position: 'absolute',
+          top: isMobile ? '12px' : '20px',
+          right: isMobile ? '16px' : '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(96, 165, 250, 0.08)',
+          border: '1px solid rgba(96, 165, 250, 0.2)',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          color: 'var(--p-blue)',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          padding: 0,
+          zIndex: 2
+        }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 16, fontWeight: 'bold' }}>
+          {isMinimized ? 'expand_more' : 'expand_less'}
+        </span>
+      </button>
+
       {/* Decorative subtle corner element */}
-      <div style={{ position: 'absolute', bottom: -15, right: -15, opacity: 0.03, color: 'var(--t4)', pointerEvents: 'none', display: window.innerWidth < 768 && isMinimized ? 'none' : 'block' }}>
+      <div style={{ position: 'absolute', bottom: -15, right: -15, opacity: 0.03, color: 'var(--t4)', pointerEvents: 'none', display: isMobile && isMinimized ? 'none' : 'block' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 100 }}>data_thresholding</span>
       </div>
     </div>
   );
-}
+});
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -447,41 +452,42 @@ export default function Dashboard() {
   const { theme } = useTheme();
   const isLight = theme === 'light';
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isMobile = useIsMobile();
   const [currentMood, setCurrentMood] = useState(PersonalizationEngine.getMood());
 
+  const weeklyDigestRef = useRef(false);
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  useEffect(() => {
-    if (!AI.enabled()) return;
+    if (!AI.enabled() || weeklyDigestRef.current) return;
     const profile = PersonalizationEngine.getProfile(user?.name);
     const lastDigest = profile.weeklyDigests?.[0];
     const daysSince = lastDigest ? (Date.now() - new Date(lastDigest.generatedAt).getTime()) / 86400000 : 999;
 
     if (daysSince >= 7 && (progress?.totalHours > 0 || tasks?.length > 0)) {
+      weeklyDigestRef.current = true;
       generateWeeklyDigest({ user, progress, tasks })
         .catch(err => console.error('[Personalization] Weekly digest failed:', err));
     }
-  }, [user?.name, progress, tasks]);
+  }, [user?.name]);
 
-  const pending = tasks.filter(t => t.status === 'pending');
-  const focusTasks = [...pending].sort((a, b) => { const o = { high: 0, medium: 1, low: 2 }; return (o[a.priority] ?? 1) - (o[b.priority] ?? 1); }).slice(0, 3);
-  const upcoming = pending.filter(t => t.deadline).sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 3);
+  const pending = useMemo(() => tasks.filter(t => t.status === 'pending'), [tasks]);
+  const focusTasks = useMemo(() => {
+    const o = { high: 0, medium: 1, low: 2 };
+    return [...pending].sort((a, b) => (o[a.priority] ?? 1) - (o[b.priority] ?? 1)).slice(0, 3);
+  }, [pending]);
+  const upcoming = useMemo(() => pending.filter(t => t.deadline).sort((a, b) => new Date(a.deadline) - new Date(b.deadline)).slice(0, 3), [pending]);
 
   const avgPct = useMemo(() => {
     const vals = Object.values(progress?.subjects || {}).map(s => s.progress);
     return vals.length ? Math.round(vals.reduce((a, v) => a + v, 0) / vals.length) : 0;
-  }, [progress]);
+  }, [progress?.subjects]);
 
-  const activePath = paths.find(p => p.status === 'active');
-  const earned = allAchs?.filter(a => a.earned).length || 0;
-  const total = allAchs?.length || 1;
+  const activePath = useMemo(() => paths.find(p => p.status === 'active'), [paths]);
+  const earned = useMemo(() => allAchs?.filter(a => a.earned).length || 0, [allAchs]);
+  const total = useMemo(() => allAchs?.length || 1, [allAchs]);
 
-  const weekHours = DAYS.map((d, i) => ({ d, v: progress?.weeklyHours?.[i] ?? 0 }));
+  const weekHours = useMemo(() => {
+    return DAYS.map((d, i) => ({ d, v: progress?.weeklyHours?.[i] ?? 0 }));
+  }, [progress?.weeklyHours]);
 
   return (
     <div className="page dashboard-main-container">
@@ -1130,11 +1136,11 @@ export default function Dashboard() {
           { to: '/checkin', icon: 'sentiment_satisfied', label: 'Check In', color: '#e9cd6e' },
         ].map(({ to, icon, label, color }, i) => (
           <Link key={to} to={to} style={{ textDecoration: 'none' }}>
-            <div className="card card-hover" style={{ padding: '16px 12px', textAlign: 'center', cursor: 'pointer', animationDelay: `${i * 0.05}s`, border: `1px solid ${color}22` }}>
-              <div style={{ width: 40, height: 40, borderRadius: 'var(--r-md)', background: `${color}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+            <div className="card card-hover" style={{ padding: isMobile ? '12px 10px' : '16px 12px', minHeight: isMobile ? '84px' : 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', cursor: 'pointer', animationDelay: `${i * 0.05}s`, border: `1px solid ${color}22` }}>
+              <div style={{ width: 40, height: 40, borderRadius: 'var(--r-md)', background: `${color}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: isMobile ? '0 auto 6px' : '0 auto 10px', flexShrink: 0 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color, fontVariationSettings: "'FILL' 1" }}>{icon}</span>
               </div>
-              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>{label}</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)', margin: 0 }}>{label}</p>
             </div>
           </Link>
         ))}

@@ -2,7 +2,7 @@ import { createContext,useContext,useReducer,useEffect,useMemo,useCallback,useRe
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { genId,calcBurnout,ALL_ACHIEVEMENTS,isToday } from '@utils';
-import { db, supabase } from '@services/supabase';
+import { db, supabase, refreshSession, probeConnection, connectionStatus } from '@services/supabase';
 import { notesCloud } from '@services/notesCloud';
 import { useAuth } from './AuthContext';
 
@@ -14,6 +14,22 @@ const TimerCtx = createContext(null);
 let currentAlarmSource = null;
 let currentAlarmCtx = null;
 let alarmLoopTimer = null;
+let warmedUpAudioCtx = null;
+
+export function warmUpAudio() {
+  if (warmedUpAudioCtx) return;
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) {
+      warmedUpAudioCtx = new AudioContextClass();
+      if (warmedUpAudioCtx.state === 'suspended') {
+        warmedUpAudioCtx.resume().catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.warn('[Audio Warmup] Failed to initialize AudioContext:', e);
+  }
+}
 
 function playChime(ctx, startTime) {
   // Create a pleasant two-tone chime
@@ -57,12 +73,15 @@ export function playAlarmSound() {
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
 
-    const ctx = new AudioContextClass();
+    let ctx = warmedUpAudioCtx;
+    if (!ctx || ctx.state === 'closed') {
+      ctx = new AudioContextClass();
+    }
     currentAlarmCtx = ctx;
 
     // If AudioContext is suspended (autoplay policy), resume it
     if (ctx.state === 'suspended') {
-      ctx.resume();
+      ctx.resume().catch(err => console.warn('[Alarm Sound] Autoplay blocked ctx.resume:', err));
     }
 
     // Play initial burst: 3 chimes
@@ -172,6 +191,13 @@ export function startSWKeepalive() {
       }
     } catch (e) {}
   }, 20000); // Ping every 20s
+}
+
+export function stopSWKeepalive() {
+  if (swKeepaliveTimer) {
+    clearInterval(swKeepaliveTimer);
+    swKeepaliveTimer = null;
+  }
 }
 
 // ── Clean Slate Defaults (Production) ────────────────────────────────
@@ -357,28 +383,44 @@ function loadState() {
   }
 }
 
+// Debounced localStorage writer — uses requestIdleCallback to avoid blocking UI
+let _saveLocalTimer = null;
+let _saveLocalIdle = null;
 function saveLocal(state) {
-  try {
-    // Strip transient data to reduce storage size
-    const toSave = { ...state, _dataVersion: DATA_VERSION };
-    // Reset timer running state (not meaningful across sessions)
-    if (toSave.timer?.isRunning) {
-      toSave.timer = { 
-        ...toSave.timer, 
-        isRunning: false, 
-        endTime: 0, 
-        remain: (toSave.timer.isBreak ? toSave.timer.duration : (toSave.timer.duration || 25)) * 60 
-      };
+  // Cancel any pending save
+  if (_saveLocalTimer) clearTimeout(_saveLocalTimer);
+  if (_saveLocalIdle && typeof cancelIdleCallback === 'function') cancelIdleCallback(_saveLocalIdle);
+
+  // Micro-debounce: wait 100ms, then write during idle time
+  _saveLocalTimer = setTimeout(() => {
+    const doSave = () => {
+      try {
+        const toSave = { ...state, _dataVersion: DATA_VERSION };
+        if (toSave.timer?.isRunning) {
+          toSave.timer = { 
+            ...toSave.timer, 
+            isRunning: false, 
+            endTime: 0, 
+            remain: (toSave.timer.isBreak ? toSave.timer.duration : (toSave.timer.duration || 25)) * 60 
+          };
+        }
+        const serialized = JSON.stringify(toSave);
+        localStorage.setItem(STORAGE_KEY, serialized);
+        localStorage.setItem(STORAGE_META_KEY, JSON.stringify({ 
+          savedAt: Date.now(), 
+          size: serialized.length 
+        }));
+      } catch(e) {
+        console.error('[Storage] Failed to save local state:', e);
+      }
+    };
+
+    if (typeof requestIdleCallback === 'function') {
+      _saveLocalIdle = requestIdleCallback(doSave, { timeout: 2000 });
+    } else {
+      doSave();
     }
-    const serialized = JSON.stringify(toSave);
-    localStorage.setItem(STORAGE_KEY, serialized);
-    localStorage.setItem(STORAGE_META_KEY, JSON.stringify({ 
-      savedAt: Date.now(), 
-      size: serialized.length 
-    }));
-  } catch(e) {
-    console.error('[Storage] Failed to save local state:', e);
-  }
+  }, 100);
 }
 
 function smartMerge(localState, cloudData) {
@@ -481,10 +523,30 @@ export function AppProvider({ children }) {
   const { user, isAuth } = useAuth();
   const [state, dispatch] = useReducer(reducer, INIT);
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'error', 'offline'
+  const syncStatusRef = useRef('idle');
+  useEffect(() => { syncStatusRef.current = syncStatus; }, [syncStatus]);
   const isInitialMount = useRef(true);
   const syncTimeoutRef = useRef(null);
   const lastSyncedHash = useRef('');
   const pendingSync = useRef(false);
+
+  // ── Audio Context Autoplay Warmup ──
+  useEffect(() => {
+    const warmUp = () => {
+      warmUpAudio();
+      window.removeEventListener('click', warmUp);
+      window.removeEventListener('keydown', warmUp);
+      window.removeEventListener('touchstart', warmUp);
+    };
+    window.addEventListener('click', warmUp, { once: true });
+    window.addEventListener('keydown', warmUp, { once: true });
+    window.addEventListener('touchstart', warmUp, { once: true });
+    return () => {
+      window.removeEventListener('click', warmUp);
+      window.removeEventListener('keydown', warmUp);
+      window.removeEventListener('touchstart', warmUp);
+    };
+  }, []);
 
   // Background Timer Engine (Resilient to Browser Throttling)
   useEffect(() => {
@@ -613,20 +675,19 @@ export function AppProvider({ children }) {
   }, [isAuth, user?.id]);
 
   // ── Smart Sync Engine ────────────────────
-  // Generates a hash of meaningful data (excludes timer ticks)
+  // Lightweight hash of meaningful data (excludes timer ticks)
+  // Uses simple string concatenation instead of JSON.stringify for speed
   const getStateHash = useCallback((s) => {
-    const meaningful = {
-      // Include notes in the hash so local storage is updated upon note modifications
-      notes: s.notes?.map(n => `${n.id}-${n.updatedAt}`).join(','),
-      tasks: s.tasks?.map(t => t.id + t.status).join(','),
-      checkIns: s.checkIns?.length,
-      paths: s.paths?.length,
-      schedule: s.schedule?.length,
-      videos: s.videos?.map(v => `${v.id}-${v.playlist || ''}-${v.watched}-${v.notes?.length || 0}`).join(','),
-      achievements: s.achievements?.length,
-      progress: JSON.stringify(s.progress),
-    };
-    return JSON.stringify(meaningful);
+    let h = '';
+    if (s.notes) for (let i = 0; i < s.notes.length; i++) h += s.notes[i].id + s.notes[i].updatedAt + ',';
+    if (s.tasks) for (let i = 0; i < s.tasks.length; i++) h += s.tasks[i].id + s.tasks[i].status + ',';
+    h += '|' + (s.checkIns?.length || 0);
+    h += '|' + (s.paths?.length || 0);
+    h += '|' + (s.schedule?.length || 0);
+    if (s.videos) for (let i = 0; i < s.videos.length; i++) h += s.videos[i].id + (s.videos[i].watched ? '1' : '0') + ',';
+    h += '|' + (s.achievements?.length || 0);
+    h += '|' + (s.progress?.streak || 0) + ':' + (s.progress?.totalHours || 0) + ':' + (s.progress?.focusSessions || 0);
+    return h;
   }, []);
 
   useEffect(() => {
@@ -664,10 +725,16 @@ export function AppProvider({ children }) {
   // ── Flush pending sync on page unload ────
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Save to localStorage one final time
-      saveLocal(stateRef.current);
-      
-      // If there's a pending cloud sync, try to flush it
+      // Immediate synchronous save to localStorage (bypass the debounce)
+      try {
+        const toSave = { ...stateRef.current, _dataVersion: DATA_VERSION };
+        if (toSave.timer?.isRunning) {
+          toSave.timer = { ...toSave.timer, isRunning: false, endTime: 0, remain: (toSave.timer.duration || 25) * 60 };
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      } catch (e) {
+        console.error('[Storage] Unload save failed:', e);
+      }
       if (pendingSync.current && isAuth && user?.id) {
         // Read auth token from localStorage (avoiding async await inside unload)
         const rawSession = localStorage.getItem('sb-cihpvkrvepsctepxwmox-auth-token');
@@ -719,14 +786,59 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isAuth, user?.id]);
 
+  // ── Force Sync (callable from SyncIndicator click) ────
+  const forceSync = useCallback(async () => {
+    if (!isAuth || !user?.id) return;
+    console.log('[Sync] Manual force-sync triggered');
+    setSyncStatus('syncing');
+
+    // 1. Refresh the auth session to get a fresh JWT
+    const sessionOk = await refreshSession();
+    if (!sessionOk) {
+      console.warn('[Sync] Session refresh failed during force-sync');
+    }
+
+    // 2. Probe real connectivity (catches stale connections)
+    const reachable = await probeConnection();
+    if (!reachable) {
+      console.warn('[Sync] Supabase unreachable during force-sync');
+      setSyncStatus('error');
+      toast.error('Cloud unreachable — check your connection', { id: 'sync-err' });
+      return;
+    }
+
+    // 3. Force connectionStatus online (it may have been stuck)
+    connectionStatus.forceOnline();
+
+    // 4. Push current state to cloud
+    try {
+      const ok = await db.saveUserData(user.id, stateRef.current);
+      if (ok) {
+        setSyncStatus('synced');
+        pendingSync.current = false;
+        toast.success('Cloud synced successfully ☁️', { id: 'sync-ok', duration: 2000 });
+      } else {
+        setSyncStatus('error');
+        toast.error('Cloud sync failed — retrying later', { id: 'sync-err' });
+      }
+    } catch (err) {
+      console.error('[Sync] Force-sync push error:', err);
+      setSyncStatus('error');
+    }
+  }, [isAuth, user?.id]);
+
   // ── Auto-retry on reconnect ──────────────
   useEffect(() => {
     const handleOnline = () => {
       console.log('[Sync] Back online — triggering cloud sync');
       setSyncStatus('syncing');
       if (isAuth && user?.id) {
-        db.saveUserData(user.id, stateRef.current).then(ok => {
-          setSyncStatus(ok ? 'synced' : 'error');
+        // Refresh session first, then sync
+        refreshSession().then(() => {
+          connectionStatus.forceOnline();
+          db.saveUserData(user.id, stateRef.current).then(ok => {
+            setSyncStatus(ok ? 'synced' : 'error');
+          });
         });
       }
     };
@@ -734,23 +846,157 @@ export function AppProvider({ children }) {
     return () => window.removeEventListener('online', handleOnline);
   }, [isAuth, user?.id]);
 
-  // Auto-unlock achievements
+  // ── Real-Time Cloud Sync Subscriptions ───────────
   useEffect(() => {
-    const s = {
-      notes:   state.notes.length,
-      aiNotes: state.notes.filter(n=>n.aiEnhanced).length,
-      tasks:   state.tasks.filter(t=>t.status==='completed').length,
-      streak:  state.progress.streak,
-      sessions:state.progress.focusSessions,
-      hours:   state.progress.totalHours,
-      paths:   state.paths.length,
-      done:    state.paths.filter(p=>p.status==='completed').length,
-    };
-    ALL_ACHIEVEMENTS.forEach(a => {
-      if (!state.achievements.find(e=>e.id===a.id) && a.req(s)) {
-        dispatch({ type:'ACH_UNLOCK', payload:{ id:a.id,title:a.title,desc:a.desc,icon:a.icon,color:a.color,cat:a.cat,earnedAt:new Date().toISOString() } });
+    if (!isAuth || !user?.id || !supabase) return;
+
+    let active = true;
+
+    // 1. Subscribe to monolithic user_data changes (tasks, schedule, progress, achievements)
+    const userDataChannel = supabase
+      .channel(`rt:user_data:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_data',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (!active) return;
+          console.log('[Real-Time Sync] Monolithic data update received from cloud');
+          
+          const cloudData = payload.new?.data;
+          const cloudUpdatedAt = payload.new?.updated_at;
+          if (cloudData) {
+            const cloudTime = new Date(cloudUpdatedAt).getTime();
+            const localTime = connectionStatus.lastSync;
+            
+            // Only merge if cloud update is strictly newer than our last local sync/save
+            if (cloudTime > localTime) {
+              const merged = smartMerge(stateRef.current, cloudData);
+              
+              // Prevent triggering an outgoing loop: pre-hash state change
+              lastSyncedHash.current = getStateHash(merged);
+              
+              dispatch({ type: 'SYNC_CLOUD', payload: merged });
+              saveLocal(merged);
+              setSyncStatus('synced');
+              toast.success('Synced changes from cloud ☁️', { id: 'rt-sync-ok', duration: 1500 });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Subscribe to surgical notes changes
+    const notesChannel = supabase
+      .channel(`rt:notes:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notes',
+          filter: `user_id=eq.${user.id}`,
+        },
+        async (payload) => {
+          if (!active) return;
+          console.log('[Real-Time Sync] Notes update received from cloud:', payload.eventType);
+          
+          // Re-fetch notes surgically and update state
+          const cloudNotes = await notesCloud.fetchNotes(user.id);
+          if (cloudNotes && active) {
+            const merged = { ...stateRef.current, notes: cloudNotes };
+            
+            // Prevent triggering an outgoing loop: pre-hash state change
+            lastSyncedHash.current = getStateHash(merged);
+            
+            dispatch({ type: 'SYNC_CLOUD', payload: { notes: cloudNotes } });
+            saveLocal(merged);
+            setSyncStatus('synced');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      if (supabase) {
+        supabase.removeChannel(userDataChannel);
+        supabase.removeChannel(notesChannel);
       }
-    });
+    };
+  }, [isAuth, user?.id, getStateHash]);
+
+  // ── Periodic Cloud Keepalive (every 5 minutes) ────────
+  // Prevents the sync from silently dying due to stale JWT tokens,
+  // dormant WebSocket connections, or unreliable navigator.onLine.
+  useEffect(() => {
+    if (!isAuth || !user?.id) return;
+
+    const KEEPALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+    const keepalive = async () => {
+      // 1. Refresh auth session to prevent JWT expiry
+      await refreshSession();
+
+      // 2. Probe real connectivity
+      const reachable = await probeConnection();
+
+      const currentSyncStatus = syncStatusRef.current;
+      if (reachable) {
+        connectionStatus.forceOnline();
+        // If status was error, recover it
+        if (currentSyncStatus === 'error' || currentSyncStatus === 'idle') {
+          console.log('[Sync] Keepalive recovered connection — pushing data');
+          setSyncStatus('syncing');
+          const ok = await db.saveUserData(user.id, stateRef.current);
+          setSyncStatus(ok ? 'synced' : 'error');
+        }
+      } else {
+        // Only mark error if we were previously synced (don't spam)
+        if (currentSyncStatus === 'synced') {
+          console.warn('[Sync] Keepalive: connection lost');
+          setSyncStatus('error');
+        }
+      }
+    };
+
+    const intervalId = setInterval(keepalive, KEEPALIVE_INTERVAL);
+
+    // Also run once shortly after mount to catch early stale states
+    const initialTimerId = setTimeout(keepalive, 30000);
+
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(initialTimerId);
+    };
+  }, [isAuth, user?.id]);
+
+  // Auto-unlock achievements (debounced to avoid synchronous .filter() on every state change)
+  const achTimerRef = useRef(null);
+  useEffect(() => {
+    if (achTimerRef.current) clearTimeout(achTimerRef.current);
+    achTimerRef.current = setTimeout(() => {
+      const s = {
+        notes:   state.notes.length,
+        aiNotes: state.notes.filter(n=>n.aiEnhanced).length,
+        tasks:   state.tasks.filter(t=>t.status==='completed').length,
+        streak:  state.progress.streak,
+        sessions:state.progress.focusSessions,
+        hours:   state.progress.totalHours,
+        paths:   state.paths.length,
+        done:    state.paths.filter(p=>p.status==='completed').length,
+      };
+      ALL_ACHIEVEMENTS.forEach(a => {
+        if (!state.achievements.find(e=>e.id===a.id) && a.req(s)) {
+          dispatch({ type:'ACH_UNLOCK', payload:{ id:a.id,title:a.title,desc:a.desc,icon:a.icon,color:a.color,cat:a.cat,earnedAt:new Date().toISOString() } });
+        }
+      });
+    }, 500); // Debounce 500ms — achievements aren't time-critical
+    return () => clearTimeout(achTimerRef.current);
   }, [state.notes.length, state.tasks.length, state.progress.streak, state.progress.focusSessions]);
 
   // ── Session Auto-Trigger & Alarms & Reminders Engine ───────────────────
@@ -794,7 +1040,9 @@ export function AppProvider({ children }) {
   // Start service worker keepalive
   useEffect(() => {
     startSWKeepalive();
-    return () => {};
+    return () => {
+      stopSWKeepalive();
+    };
   }, []);
 
   // Sync alarm data to service worker whenever alarms or schedule change
@@ -810,6 +1058,10 @@ export function AppProvider({ children }) {
       const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
       const minuteKey = `${today}_${currentTime}`;
 
+      // Read latest state from ref to avoid dependency churn
+      const currentSchedule = stateRef.current.schedule || [];
+      const currentAlarms = stateRef.current.alarms || [];
+
       // Reset triggered set each new minute
       if (triggeredSet.current._minuteKey !== minuteKey) {
         triggeredSet.current = new Set();
@@ -817,7 +1069,7 @@ export function AppProvider({ children }) {
       }
 
       // 1. Session Exact Start Auto-Trigger (Focus redirection)
-      const session = state.schedule.find(s => s.day === today && s.startTime === currentTime);
+      const session = currentSchedule.find(s => s.day === today && s.startTime === currentTime);
       if (session && !triggeredSet.current.has(session.id)) {
         triggeredSet.current.add(session.id);
         lastTriggered.current = session.id;
@@ -839,7 +1091,7 @@ export function AppProvider({ children }) {
       }
 
       // 2. 5-Minute Pre-Task Reminder Notification
-      state.schedule.forEach(s => {
+      currentSchedule.forEach(s => {
         if (s.day === today) {
           const [sh, sm] = s.startTime.split(':').map(Number);
           const sTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), sh, sm, 0);
@@ -867,7 +1119,7 @@ export function AppProvider({ children }) {
       });
 
       // 3. Custom Alarms Triggering
-      (state.alarms || []).forEach(alarm => {
+      currentAlarms.forEach(alarm => {
         if (alarm.enabled && alarm.time === currentTime) {
           const alarmTriggerId = `alarm_${alarm.id}_${today}_${currentTime}`;
           if (!triggeredSet.current.has(alarmTriggerId)) {
@@ -892,9 +1144,9 @@ export function AppProvider({ children }) {
     };
 
     const interval = setInterval(checkScheduleAndAlarms, 15000); // Check every 15s
-    checkScheduleAndAlarms(); // Run immediately on mount/update
+    checkScheduleAndAlarms(); // Run immediately on mount
     return () => clearInterval(interval);
-  }, [state.schedule, state.alarms, navigate]);
+  }, [navigate]); // stable dep — reads schedule/alarms from stateRef
 
   // Computed
   const pending   = useMemo(()=>state.tasks.filter(t=>t.status==='pending'),[state.tasks]);
@@ -986,12 +1238,12 @@ export function AppProvider({ children }) {
     return {
       ...rest, 
       user: user || state.user, // Prioritize AuthContext user
-      pending, completed, topTasks, deadlines, todayCI, burnout, activePath, todaySched, allAchs, syncStatus, A
+      pending, completed, topTasks, deadlines, todayCI, burnout, activePath, todaySched, allAchs, syncStatus, forceSync, A
     };
   }, [
     state.notes, state.tasks, state.checkIns, state.paths, state.schedule, state.videos,
     state.achievements, state.progress, state.user, user, state.alarms, state.activeAlarm,
-    pending, completed, topTasks, deadlines, todayCI, burnout, activePath, todaySched, allAchs, syncStatus, A
+    pending, completed, topTasks, deadlines, todayCI, burnout, activePath, todaySched, allAchs, syncStatus, forceSync, A
   ]);
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { useFocusShield } from '@context/FocusShieldContext';
+import { useFocusShield, isProtectedProcess } from '@context/FocusShieldContext';
 
 function Toggle({ on, onChange }) {
   return (
@@ -37,6 +37,38 @@ function Toggle({ on, onChange }) {
   );
 }
 
+/**
+ * Extracts a valid, blockable process name from various formats:
+ * - Windows executable paths (C:\...\app.exe → app)
+ * - UWP AppUserModelIDs (Microsoft.WindowsCalculator_8wekyb3d8bbwe!App → WindowsCalculator)
+ * - Start-menu display names
+ */
+function extractBlockName(app) {
+  if (!app) return '';
+
+  // If app has an AppID field, try to extract from it
+  const id = app.AppID || '';
+
+  // Strategy 1: Extract .exe base name from path
+  const exeMatch = id.match(/([^\\/]+)\.exe$/i);
+  if (exeMatch) return exeMatch[1];
+
+  // Strategy 2: Extract from UWP model ID (e.g., Microsoft.WindowsCalculator_xxx!App)
+  const uwpMatch = id.match(/(?:^|\.)([A-Za-z][A-Za-z0-9]+)_[a-z0-9]+!/i);
+  if (uwpMatch) return uwpMatch[1];
+
+  // Strategy 3: Extract short segment before underscore or bang from AppID
+  if (id && id.includes('!')) {
+    const beforeBang = id.split('!')[0];
+    const parts = beforeBang.split('.');
+    const last = parts[parts.length - 1];
+    if (last && last.length > 2 && !last.includes('_')) return last;
+  }
+
+  // Fallback: use the display name directly (strip .exe if present)
+  return (app.Name || '').replace(/\.exe$/i, '').trim();
+}
+
 export default function DesktopFocusShield() {
   const {
     settings: shieldSettings,
@@ -56,28 +88,37 @@ export default function DesktopFocusShield() {
   const [showProcessPicker, setShowProcessPicker] = useState(false);
   const [pickerTab, setPickerTab] = useState('running'); // 'running' | 'installed'
   const [pickerSearch, setPickerSearch] = useState('');
+  const [scanError, setScanError] = useState('');
 
   const fetchRunningProcesses = async () => {
     setLoadingProcesses(true);
+    setScanError('');
     try {
       const res = await fetch('/api/processes');
       if (res.ok) {
         const data = await res.json();
+        // Handle edge case: API returns an object (error) or non-array
+        if (!Array.isArray(data)) {
+          setActiveProcesses([]);
+          if (data?.error) setScanError(data.error);
+          return;
+        }
         const unique = [];
         const seen = new Set();
-        for (const item of (Array.isArray(data) ? data : [])) {
+        for (const item of data) {
           if (!item || !item.ProcessName) continue;
-          const cleanName = item.ProcessName.trim();
-          if (!seen.has(cleanName.toLowerCase())) {
-            seen.add(cleanName.toLowerCase());
-            unique.push(item);
-          }
+          const cleanName = item.ProcessName.replace(/\.exe$/i, '').trim();
+          if (!cleanName || seen.has(cleanName.toLowerCase())) continue;
+          seen.add(cleanName.toLowerCase());
+          unique.push({ ...item, ProcessName: cleanName });
         }
         setActiveProcesses(unique.sort((a, b) => a.ProcessName.localeCompare(b.ProcessName)));
       } else {
+        setScanError('Failed to query system applications.');
         toast.error('Failed to query system applications.');
       }
     } catch (e) {
+      setScanError('Local background service is not running.');
       toast.error('Local background service is not running.');
     } finally {
       setLoadingProcesses(false);
@@ -86,11 +127,16 @@ export default function DesktopFocusShield() {
 
   const fetchInstalledApps = async () => {
     setLoadingInstalled(true);
+    setScanError('');
     try {
       const res = await fetch('/api/installed-apps');
       if (res.ok) {
         const data = await res.json();
-        const apps = (Array.isArray(data) ? data : [])
+        if (!Array.isArray(data)) {
+          setInstalledApps([]);
+          return;
+        }
+        const apps = data
           .filter(a => a && a.Name && !a.Name.startsWith('Uninstall'))
           .sort((a, b) => a.Name.localeCompare(b.Name));
         setInstalledApps(apps);
@@ -230,7 +276,7 @@ export default function DesktopFocusShield() {
                 value={newSite}
                 onChange={e => setNewSite(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && newSite.trim()) {
                     addBlockedSite(newSite);
                     setNewSite('');
                   }
@@ -239,8 +285,10 @@ export default function DesktopFocusShield() {
               />
               <button
                 onClick={() => {
-                  addBlockedSite(newSite);
-                  setNewSite('');
+                  if (newSite.trim()) {
+                    addBlockedSite(newSite);
+                    setNewSite('');
+                  }
                 }}
                 className="btn btn-primary"
                 style={{ padding: '8px 16px', fontSize: 12.5, flexShrink: 0 }}
@@ -296,6 +344,7 @@ export default function DesktopFocusShield() {
                   setShowProcessPicker(true);
                   setPickerTab('running');
                   setPickerSearch('');
+                  setScanError('');
                   fetchRunningProcesses();
                   fetchInstalledApps();
                 }}
@@ -314,7 +363,7 @@ export default function DesktopFocusShield() {
                 value={newApp}
                 onChange={e => setNewApp(e.target.value)}
                 onKeyDown={e => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && newApp.trim()) {
                     addBlockedApp(newApp);
                     setNewApp('');
                   }
@@ -323,8 +372,10 @@ export default function DesktopFocusShield() {
               />
               <button
                 onClick={() => {
-                  addBlockedApp(newApp);
-                  setNewApp('');
+                  if (newApp.trim()) {
+                    addBlockedApp(newApp);
+                    setNewApp('');
+                  }
                 }}
                 className="btn btn-primary"
                 style={{ padding: '8px 16px', fontSize: 12.5, flexShrink: 0 }}
@@ -378,14 +429,7 @@ export default function DesktopFocusShield() {
           !searchLower || p.ProcessName.toLowerCase().includes(searchLower) || (p.MainWindowTitle || '').toLowerCase().includes(searchLower)
         );
 
-        // Filter installed apps and extract a usable block name from AppID
-        const getBlockName = (app) => {
-          const id = app.AppID || '';
-          const exeMatch = id.match(/([^\\\/]+)\.exe/i);
-          if (exeMatch) return exeMatch[1];
-          return app.Name;
-        };
-
+        // Filter installed apps
         const filteredInstalled = installedApps.filter(a =>
           !searchLower || a.Name.toLowerCase().includes(searchLower)
         );
@@ -444,12 +488,21 @@ export default function DesktopFocusShield() {
                 style={{ padding: '9px 14px', fontSize: 12.5, marginBottom: 12, borderRadius: 10 }}
               />
 
-              <p style={{ fontSize: 11, color: 'var(--t4)', marginBottom: 10 }}>
-                {pickerTab === 'running'
-                  ? `${filteredProcesses.length} running app${filteredProcesses.length !== 1 ? 's' : ''} found`
-                  : `${filteredInstalled.length} installed app${filteredInstalled.length !== 1 ? 's' : ''} found`
-                }
-              </p>
+              {/* Status Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <p style={{ fontSize: 11, color: 'var(--t4)', margin: 0 }}>
+                  {pickerTab === 'running'
+                    ? `${filteredProcesses.length} running app${filteredProcesses.length !== 1 ? 's' : ''} found`
+                    : `${filteredInstalled.length} installed app${filteredInstalled.length !== 1 ? 's' : ''} found`
+                  }
+                </p>
+                {scanError && (
+                  <p style={{ fontSize: 10, color: '#f43f5e', margin: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 12, verticalAlign: 'middle', marginRight: 3 }}>error</span>
+                    {scanError}
+                  </p>
+                )}
+              </div>
 
               {/* App List */}
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4, scrollbarWidth: 'thin' }}>
@@ -465,34 +518,54 @@ export default function DesktopFocusShield() {
                     </p>
                   ) : (
                     filteredProcesses.map(proc => {
-                      const isBlocked = (shieldSettings.blockedApps || []).some(a => a.toLowerCase() === proc.ProcessName.toLowerCase());
+                      const isProtected = isProtectedProcess(proc.ProcessName);
+                      const isBlocked = !isProtected && (shieldSettings.blockedApps || []).some(a => a.toLowerCase() === proc.ProcessName.toLowerCase());
                       return (
                         <div key={`${proc.ProcessName}-${proc.Id}`} style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 14px', background: isBlocked ? 'rgba(244,63,94,0.04)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${isBlocked ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.05)'}`,
+                          padding: '10px 14px',
+                          background: isProtected ? 'rgba(96,165,250,0.04)' : isBlocked ? 'rgba(244,63,94,0.04)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${isProtected ? 'rgba(96,165,250,0.15)' : isBlocked ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.05)'}`,
                           borderRadius: 12, transition: 'all 0.15s ease'
                         }}>
                           <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {proc.ProcessName}
-                            </p>
-                            <p style={{ fontSize: 11, color: 'var(--t3)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: 14,
+                                color: isProtected ? '#60a5fa' : isBlocked ? '#f43f5e' : 'var(--t3)',
+                              }}>
+                                {isProtected ? 'verified_user' : isBlocked ? 'block' : 'apps'}
+                              </span>
+                              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {proc.ProcessName}
+                              </p>
+                            </div>
+                            <p style={{ fontSize: 11, color: 'var(--t3)', margin: '2px 0 0 20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {proc.MainWindowTitle || 'Active window'}
                             </p>
                           </div>
-                          <button
-                            onClick={() => isBlocked ? removeBlockedApp(proc.ProcessName) : addBlockedApp(proc.ProcessName)}
-                            style={{
-                              padding: '6px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, flexShrink: 0,
-                              border: isBlocked ? '1px solid rgba(244,63,94,0.25)' : '1px solid rgba(9,205,131,0.25)',
-                              background: isBlocked ? 'rgba(244,63,94,0.08)' : 'rgba(9,205,131,0.08)',
-                              color: isBlocked ? '#f43f5e' : 'var(--p)', cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {isBlocked ? '✗ Unblock' : '+ Block'}
-                          </button>
+                          {isProtected ? (
+                            <span style={{
+                              padding: '5px 12px', fontSize: 10, fontWeight: 800, borderRadius: 8, flexShrink: 0,
+                              border: '1px solid rgba(96,165,250,0.25)', background: 'rgba(96,165,250,0.08)',
+                              color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.04em'
+                            }}>
+                              🔒 Protected
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => isBlocked ? removeBlockedApp(proc.ProcessName) : addBlockedApp(proc.ProcessName)}
+                              style={{
+                                padding: '6px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, flexShrink: 0,
+                                border: isBlocked ? '1px solid rgba(244,63,94,0.25)' : '1px solid rgba(9,205,131,0.25)',
+                                background: isBlocked ? 'rgba(244,63,94,0.08)' : 'rgba(9,205,131,0.08)',
+                                color: isBlocked ? '#f43f5e' : 'var(--p)', cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isBlocked ? '✗ Unblock' : '+ Block'}
+                            </button>
+                          )}
                         </div>
                       );
                     })
@@ -504,35 +577,63 @@ export default function DesktopFocusShield() {
                     </p>
                   ) : (
                     filteredInstalled.map((app, i) => {
-                      const blockName = getBlockName(app);
-                      const isBlocked = (shieldSettings.blockedApps || []).some(a => a.toLowerCase() === blockName.toLowerCase());
+                      const blockName = extractBlockName(app);
+                      const isProtected = isProtectedProcess(blockName) || isProtectedProcess(app.Name);
+                      const isBlocked = !isProtected && blockName && (shieldSettings.blockedApps || []).some(a => a.toLowerCase() === blockName.toLowerCase());
                       return (
                         <div key={`${app.Name}-${i}`} style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 14px', background: isBlocked ? 'rgba(244,63,94,0.04)' : 'rgba(255,255,255,0.02)',
-                          border: `1px solid ${isBlocked ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.05)'}`,
+                          padding: '10px 14px',
+                          background: isProtected ? 'rgba(96,165,250,0.04)' : isBlocked ? 'rgba(244,63,94,0.04)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${isProtected ? 'rgba(96,165,250,0.15)' : isBlocked ? 'rgba(244,63,94,0.15)' : 'rgba(255,255,255,0.05)'}`,
                           borderRadius: 12, transition: 'all 0.15s ease'
                         }}>
                           <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
-                            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {app.Name}
-                            </p>
-                            <p style={{ fontSize: 10, color: 'var(--t4)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace' }}>
-                              blocks: {blockName}
-                            </p>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span className="material-symbols-outlined" style={{
+                                fontSize: 14,
+                                color: isProtected ? '#60a5fa' : isBlocked ? '#f43f5e' : 'var(--t3)',
+                              }}>
+                                {isProtected ? 'verified_user' : isBlocked ? 'block' : 'deployed_code'}
+                              </span>
+                              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {app.Name}
+                              </p>
+                            </div>
+                            {blockName && blockName !== app.Name && (
+                              <p style={{ fontSize: 10, color: 'var(--t4)', margin: '2px 0 0 20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: 'monospace' }}>
+                                blocks: {blockName}
+                              </p>
+                            )}
                           </div>
-                          <button
-                            onClick={() => isBlocked ? removeBlockedApp(blockName) : addBlockedApp(blockName)}
-                            style={{
-                              padding: '6px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, flexShrink: 0,
-                              border: isBlocked ? '1px solid rgba(244,63,94,0.25)' : '1px solid rgba(9,205,131,0.25)',
-                              background: isBlocked ? 'rgba(244,63,94,0.08)' : 'rgba(9,205,131,0.08)',
-                              color: isBlocked ? '#f43f5e' : 'var(--p)', cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                          >
-                            {isBlocked ? '✗ Unblock' : '+ Block'}
-                          </button>
+                          {isProtected ? (
+                            <span style={{
+                              padding: '5px 12px', fontSize: 10, fontWeight: 800, borderRadius: 8, flexShrink: 0,
+                              border: '1px solid rgba(96,165,250,0.25)', background: 'rgba(96,165,250,0.08)',
+                              color: '#60a5fa', textTransform: 'uppercase', letterSpacing: '0.04em'
+                            }}>
+                              🔒 Protected
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                if (!blockName) {
+                                  toast.error('Unable to determine process name for this app.');
+                                  return;
+                                }
+                                isBlocked ? removeBlockedApp(blockName) : addBlockedApp(blockName);
+                              }}
+                              style={{
+                                padding: '6px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, flexShrink: 0,
+                                border: isBlocked ? '1px solid rgba(244,63,94,0.25)' : '1px solid rgba(9,205,131,0.25)',
+                                background: isBlocked ? 'rgba(244,63,94,0.08)' : 'rgba(9,205,131,0.08)',
+                                color: isBlocked ? '#f43f5e' : 'var(--p)', cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              {isBlocked ? '✗ Unblock' : '+ Block'}
+                            </button>
+                          )}
                         </div>
                       );
                     })
@@ -545,8 +646,9 @@ export default function DesktopFocusShield() {
                 <button
                   onClick={() => { pickerTab === 'running' ? fetchRunningProcesses() : fetchInstalledApps(); }}
                   className="btn btn-surface"
-                  style={{ flex: 1, padding: 10, fontSize: 12.5, borderRadius: 10 }}
+                  style={{ flex: 1, padding: 10, fontSize: 12.5, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>refresh</span>
                   Refresh
                 </button>
                 <button onClick={() => setShowProcessPicker(false)} className="btn btn-primary" style={{ flex: 1, padding: 10, fontSize: 12.5, borderRadius: 10 }}>

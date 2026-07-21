@@ -1,21 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <rect width="100" height="100" rx="22" fill="#0d1117" />
+  <rect width="100" height="100" rx="28" fill="#0d1310" />
   <defs>
-    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#b2dfdb" />
-      <stop offset="100%" stop-color="#0a1a19" />
+    <linearGradient id="axiniteGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="45%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#047857" />
     </linearGradient>
-    <filter id="f">
-      <feGaussianBlur stdDeviation="1" result="b"/>
-      <feComposite in="SourceGraphic" in2="b" operator="over"/>
+    <linearGradient id="axiniteFacetRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.3" />
+    </linearGradient>
+    <linearGradient id="axiniteFacetLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
-  {/* Shield Frame */}
-  <path d="M50 8 L92 32 L92 72 L50 96 L8 72 L8 32 Z" stroke="url(#g)" stroke-width="5" fill="none" />
-  {/* Layered A */}
-  <path d="M50 12 L86 85 L69 85 L50 48 L31 85 L14 85 Z" fill="url(#g)" />
-  <path d="M50 12 L69 85 L50 48 Z" fill="rgba(255,255,255,0.2)" />
-  <path d="M50 12 L50 48 L31 85 Z" fill="rgba(0,0,0,0.4)" />
-  {/* Crossbar */}
-  <path d="M33 58 L67 58 L62 67 L38 67 Z" fill="#3df5a0" filter="url(#f)" />
+
+  {/* Base Architectural Monogram Body */}
+  <path
+    d="M 50 14 C 52.5 14 75 62 78 70 C 81 77 73.5 83 67 79 L 50 68 L 33 79 C 26.5 83 19 77 22 70 C 25 62 47.5 14 50 14 Z"
+    fill="url(#axiniteGrad)"
+  />
+
+  {/* Dark Left Depth Facet */}
+  <path
+    d="M 50 14 C 47.5 14 25 62 22 70 C 19 77 26.5 83 33 79 L 50 68 Z"
+    fill="url(#axiniteFacetLeft)"
+  />
+
+  {/* Radiant Right Highlight Facet */}
+  <path
+    d="M 50 14 C 52.5 14 75 62 78 70 C 81 77 73.5 83 67 79 L 50 68 Z"
+    fill="url(#axiniteFacetRight)"
+  />
+
+  {/* Precision Cut Inner Void */}
+  <path
+    d="M 50 34 L 62 58 L 38 58 Z"
+    fill="#0d1310"
+  />
+
+  {/* Minimalist Floating Crossbar Beam */}
+  <path
+    d="M 28 53 C 28 51.5 29.5 50 31.5 50 L 68.5 50 C 70.5 50 72 51.5 72 53 C 72 54.5 70.5 56 68.5 56 L 31.5 56 C 29.5 56 28 54.5 28 53 Z"
+    fill="#34d399"
+    filter="url(#softGlow)"
+  />
+
+  {/* Apex Crystal Point */}
+  <circle cx="50" cy="14" r="2" fill="#ffffff" opacity="0.9" />
 </svg>

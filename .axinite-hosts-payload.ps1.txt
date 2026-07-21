@@ -41,4 +41,7 @@
 127.0.0.1 snapchat.com
 127.0.0.1 www.snapchat.com
 127.0.0.1 m.snapchat.com
+127.0.0.1 youtube.in
+127.0.0.1 www.youtube.in
+127.0.0.1 m.youtube.in
 # ===AXINITE-FOCUS-SHIELD-END===

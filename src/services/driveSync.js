@@ -24,7 +24,18 @@ export const driveSync = {
    * Get the saved access token.
    */
   getToken() {
-    return localStorage.getItem(DRIVE_TOKEN_KEY);
+    const raw = sessionStorage.getItem(DRIVE_TOKEN_KEY);
+    if (!raw) return null;
+    try {
+      const { token, expiresAt } = JSON.parse(raw);
+      if (Date.now() > expiresAt) {
+        sessionStorage.removeItem(DRIVE_TOKEN_KEY);
+        return null;
+      }
+      return token;
+    } catch {
+      return null;
+    }
   },
 
   /**
@@ -62,7 +73,8 @@ export const driveSync = {
             return;
           }
           
-          localStorage.setItem(DRIVE_TOKEN_KEY, response.access_token);
+          const expiresAt = Date.now() + 55 * 60 * 1000; // 55 minutes
+          sessionStorage.setItem(DRIVE_TOKEN_KEY, JSON.stringify({ token: response.access_token, expiresAt }));
           localStorage.setItem(DRIVE_LINKED_KEY, 'true');
           toast.success('Successfully linked Google Drive! ☁️', { id: 'drive_link' });
           resolve(response.access_token);
@@ -79,7 +91,8 @@ export const driveSync = {
    * Unlink Google Drive.
    */
   unlinkDrive() {
-    localStorage.removeItem(DRIVE_TOKEN_KEY);
+    sessionStorage.removeItem(DRIVE_TOKEN_KEY);
+    localStorage.removeItem(DRIVE_TOKEN_KEY); // Clean up legacy token if any
     localStorage.setItem(DRIVE_LINKED_KEY, 'false');
     toast.success('Disconnected Google Drive backups.');
   },
@@ -132,7 +145,9 @@ export const driveSync = {
         throw new Error(`Drive HTTP error ${response.status}`);
       }
 
-      console.log('[Google Drive] ✓ Lossless backup uploaded successfully');
+      if (import.meta.env.DEV) {
+        console.log('[Google Drive] ✓ Lossless backup uploaded successfully');
+      }
       return true;
     } catch (err) {
       console.error('[Google Drive] Backup upload failed:', err);

@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 import { PersonalizationEngine } from './personalization';
 import { cachedAICall, checkRateLimit, recordUsage } from './aiCache';
+import { supabase } from './supabase';
 
 const MODELS = {
   fast: 'llama-3.1-8b-instant',      // Groq — fast
@@ -62,9 +63,20 @@ const callWithRetry = async (params) => {
         signal: controller.signal,
       });
     } else {
+      const headers = { 'Content-Type': 'application/json' };
+      if (supabase) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.access_token) {
+            headers['Authorization'] = `Bearer ${data.session.access_token}`;
+          }
+        } catch (e) {
+          console.warn('[AI Service] Failed to retrieve session for request authentication:', e);
+        }
+      }
       response = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(params),
         signal: controller.signal,
       });

@@ -13,6 +13,7 @@ const PRECACHE_URLS = [
   '/index.html',
   '/favicon.svg',
   '/manifest.json',
+  '/material-symbols-outlined.woff2',
 ];
 
 // ── Install: Precache the app shell ──────────────────────────

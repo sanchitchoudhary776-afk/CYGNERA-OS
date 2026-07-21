@@ -12,13 +12,17 @@ const TRIGGERED_KEY = 'axinite_alarm_triggered';
 // ── Self-scheduling heartbeat ────────────────────────────────────
 // Service workers get killed after ~30s of idle. We use a keep-alive
 // trick: the main thread pings us, and we also use setInterval internally.
-let heartbeatInterval = null;
+let heartbeatTimeout = null;
 
 function startHeartbeat() {
-  if (heartbeatInterval) clearInterval(heartbeatInterval);
-  heartbeatInterval = setInterval(() => {
+  if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
+  
+  const runTick = () => {
     checkAlarms();
-  }, 15000); // every 15 seconds
+    heartbeatTimeout = setTimeout(runTick, 15000); // every 15 seconds
+  };
+  
+  runTick();
 }
 
 // ── Alarm checking logic ─────────────────────────────────────────

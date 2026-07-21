@@ -33,3 +33,8 @@ dist-ssr
 
 .vercel
 .env*
+
+# Focus Shield
+.axinite-*.ps1
+.axinite-*.ps1.txt
+blocked_apps.json

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useApp }   from '@context/AppContext';
 import { useNetwork } from '@context/NetworkContext';
 import { breakTask } from '@services/ai';
@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { usePremium } from '@components/ui/PremiumUI';
 import { Portal } from '@components/ui';
 import { triggerHaptic } from '../utils/haptics.js';
+import { useIsMobile } from '@utils/platform';
 
 const PC = {
   high:   { c:'#ff4e4e', bg:'rgba(255,78,78,0.06)', border:'rgba(255,78,78,0.2)', label:'Urgent' },
@@ -15,7 +16,7 @@ const PC = {
   low:    { c:'#10b981', bg:'rgba(16,185,129,0.06)', border:'rgba(16,185,129,0.2)', label:'Backlog' },
 };
 
-function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
+const TaskCard = memo(function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
   const p    = PC[task.priority] || PC.medium;
   const sc   = SUBJECT_COLORS[task.subject] || 'var(--p)';
   const days = daysUntil(task.deadline);
@@ -242,16 +243,10 @@ function TaskCard({ task, onComplete, onRestore, onEdit, onDelete, index }) {
       )}
     </div>
   );
-}
+})
 
 function TaskForm({ task, onSave, onClose }) {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
+  const isMobile = useIsMobile();
   const { isOnline } = useNetwork();
   const [form, setForm] = useState({ title:task?.title||'', description:task?.description||'', subject:task?.subject||'Web Dev', priority:task?.priority||'medium', deadline:task?.deadline?task.deadline.slice(0,10):'', estimatedMinutes:task?.estimatedMinutes||60 });
   const [subtasks, setSubtasks] = useState(task?.subtasks||[]);
@@ -285,6 +280,11 @@ function TaskForm({ task, onSave, onClose }) {
   return (
     <div onClick={onClose} className="modal-backdrop">
       <div onClick={e=>e.stopPropagation()} className="modal">
+        {isMobile && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px 0', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 999, background: 'var(--surface-b)' }} />
+          </div>
+        )}
         <div className="modal-header">
           <span style={{ fontSize:14,fontWeight:700,color:'var(--t1)' }}>{task?.id?'Edit Task':'New Task'}</span>
           <button onClick={onClose} className="icon-btn"><span className="material-symbols-outlined" style={{ fontSize:20 }}>close</span></button>
@@ -339,6 +339,24 @@ export default function Tasks() {
   const high      = pending.filter(t=>t.priority==='high').length;
   const due       = pending.filter(t=>{ const d=daysUntil(t.deadline); return d!==null&&d<=1; }).length;
 
+  const handleComplete = useCallback((id) => {
+    A.task.update({ id, status: 'completed' });
+  }, [A.task]);
+
+  const handleRestore = useCallback((id) => {
+    A.task.update({ id, status: 'pending' });
+  }, [A.task]);
+
+  const handleEdit = useCallback((t) => {
+    setEditing(t);
+    setShowForm(true);
+  }, []);
+
+  const handleDelete = useCallback((id) => {
+    A.task.remove(id);
+    toast.success('System Purged');
+  }, [A.task]);
+
   return (
     <div className="page">
       <div className="fadeup" style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'var(--gap)' }}>
@@ -387,10 +405,10 @@ export default function Tasks() {
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 360px), 1fr))', gap:'var(--gap-card)', paddingBottom:40 }}>
           {shown.map((t,i) => (
             <TaskCard key={t.id} index={i} task={t} 
-              onComplete={id=>A.task.update({id,status:'completed'})} 
-              onRestore={id=>A.task.update({id,status:'pending'})}
-              onEdit={t=>{setEditing(t);setShowForm(true);}} 
-              onDelete={id=>{A.task.remove(id);toast.success('System Purged');}}
+              onComplete={handleComplete} 
+              onRestore={handleRestore}
+              onEdit={handleEdit} 
+              onDelete={handleDelete}
             />
           ))}
         </div>

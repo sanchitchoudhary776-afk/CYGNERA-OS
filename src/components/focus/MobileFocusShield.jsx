@@ -42,10 +42,13 @@ export default function MobileFocusShield() {
     settings: shieldSettings,
     updateSettings,
     addBlockedSite,
-    removeBlockedSite
+    removeBlockedSite,
+    addBlockedApp,
+    removeBlockedApp
   } = useFocusShield();
 
   const [newSite, setNewSite] = useState('');
+  const [newApp, setNewApp] = useState('');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -136,7 +139,7 @@ export default function MobileFocusShield() {
             </div>
           </div>
 
-          {/* Blocked Sites */}
+          {/* Website Blocklist */}
           <div style={{ paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
               <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -200,6 +203,77 @@ export default function MobileFocusShield() {
               ))}
               {shieldSettings.blockedSites.length === 0 && (
                 <p style={{ fontSize: 11.5, color: 'var(--t4)', fontStyle: 'italic', margin: '4px 0 0' }}>No sites blocked yet.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Blocked Apps */}
+          <div style={{ paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 'var(--r-md)', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#3b82f6' }}>app_blocking</span>
+              </div>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', display: 'block' }}>App Blocklist</span>
+                <span style={{ fontSize: 10, color: 'var(--t3)', display: 'block', marginTop: 1 }}>On mobile, switching to these apps triggers the alarm.</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="input"
+                placeholder="e.g. Instagram, YouTube, Discord"
+                value={newApp}
+                onChange={e => setNewApp(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    addBlockedApp(newApp);
+                    setNewApp('');
+                  }
+                }}
+                style={{ padding: '8px 12px', fontSize: 12.5, flex: 1 }}
+              />
+              <button
+                onClick={() => {
+                  addBlockedApp(newApp);
+                  setNewApp('');
+                }}
+                className="btn btn-primary"
+                style={{ padding: '8px 16px', fontSize: 12.5, flexShrink: 0 }}
+              >
+                Add
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+              {(shieldSettings.blockedApps || []).map(app => (
+                <span
+                  key={app}
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 750,
+                    padding: '4px 10px',
+                    borderRadius: 99,
+                    background: 'rgba(59,130,246,0.06)',
+                    color: '#60a5fa',
+                    border: '1px solid rgba(59,130,246,0.15)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}
+                >
+                  {app}
+                  <span
+                    className="material-symbols-outlined"
+                    onClick={() => removeBlockedApp(app)}
+                    style={{ fontSize: 13, cursor: 'pointer', opacity: 0.7 }}
+                  >
+                    close
+                  </span>
+                </span>
+              ))}
+              {(shieldSettings.blockedApps || []).length === 0 && (
+                <p style={{ fontSize: 11.5, color: 'var(--t4)', fontStyle: 'italic', margin: '4px 0 0' }}>No apps blocked yet.</p>
               )}
             </div>
           </div>

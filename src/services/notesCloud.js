@@ -130,7 +130,14 @@ export const notesCloud = {
    * Hard deletes after 30 days via a Supabase scheduled function.
    */
   async deleteNote(noteId, userId) {
-    if (!userId || !connectionStatus.canSync) return;
+    if (!userId) return;
+
+    if (!connectionStatus.canSync) {
+      // Silently queue for later
+      queue.push({ type: 'delete', noteId, ts: Date.now() });
+      if (import.meta.env.DEV) console.log('[NotesCloud] Queued delete offline:', noteId);
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -143,7 +150,9 @@ export const notesCloud = {
       queue.remove(noteId);
       if (import.meta.env.DEV) console.log('[NotesCloud] ✓ Soft-deleted:', noteId);
     } catch (err) {
-      console.error('[NotesCloud] Delete error:', err?.message);
+      // Fallback: queue it for later
+      queue.push({ type: 'delete', noteId, ts: Date.now() });
+      console.error('[NotesCloud] Delete error — queued:', err?.message);
     }
   },
 
@@ -215,6 +224,13 @@ export const notesCloud = {
           const { error } = await supabase
             .from('notes')
             .upsert({ ...op.payload, user_id: userId }, { onConflict: 'id' });
+          if (!error) queue.remove(op.noteId);
+        } else if (op.type === 'delete') {
+          const { error } = await supabase
+            .from('notes')
+            .update({ deleted_at: new Date().toISOString() })
+            .eq('id', op.noteId)
+            .eq('user_id', userId);
           if (!error) queue.remove(op.noteId);
         }
         await sleep(100); // Gentle rate limiting

@@ -219,8 +219,9 @@
     padding: 20px 14px !important;
   }
 
-  .editor-title-input {
-    font-size: 24px !important;
+  .editor-title-input,
+  .editor-title-view {
+    font-size: 1.8rem !important;
   }
 
 
@@ -1079,8 +1080,9 @@ html {
   }
 
   /* Note title input */
-  .editor-title-input {
-    font-size: 22px !important;
+  .editor-title-input,
+  .editor-title-view {
+    font-size: 1.8rem !important;
   }
 
   /* Notes grid/list: single column */

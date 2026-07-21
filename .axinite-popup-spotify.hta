@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Axinite OS - Focus Shield</title>
+<hta:application 
+  id="appBlockPopup"
+  applicationname="Axinite Focus Shield"
+  border="thin"
+  borderstyle="normal"
+  caption="yes"
+  contextmenu="no"
+  maximizebutton="no"
+  minimizebutton="no"
+  navigable="no"
+  scroll="no"
+  selection="no"
+  showintaskbar="yes"
+  singleinstance="no"
+  sysmenu="yes"
+  windowstate="normal"
+/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0c1120;
+    color: #e2e8f0;
+    font-family: "Segoe UI", sans-serif;
+    margin: 0; padding: 0;
+    overflow: hidden;
+  }
+  .container {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #161232 0%, #0c1120 60%);
+    padding: 30px 36px 28px;
+  }
+  .badge {
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 16px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+  .shield-ring {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(248, 113, 113, 0.06);
+    border: 2px solid rgba(248, 113, 113, 0.3);
+    box-shadow: 0 0 24px rgba(248, 113, 113, 0.12);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .shield-ring span { font-size: 28px; }
+  h2 {
+    font-size: 20px; font-weight: 700;
+    color: #fca5a5;
+    margin-bottom: 14px;
+  }
+  .app-label {
+    font-size: 14px; color: #f1f5f9;
+    font-weight: 600;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 7px 20px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  .msg {
+    font-size: 12px; color: #64748b;
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .btn {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    padding: 10px 34px;
+    font-size: 13px; font-weight: 700;
+    border-radius: 7px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.35);
+  }
+</style>
+<script language="JavaScript">
+  window.resizeTo(460, 380);
+  window.moveTo((screen.width - 460) / 2, (screen.height - 380) / 2);
+
+  window.onbeforeunload = function() {
+    try {
+      var fso = new ActiveXObject("Scripting.FileSystemObject");
+      fso.DeleteFile("C:\\Users\\Lenovo\\Downloads\\learner-os-FINAL-v4\\.axinite-popup-spotify.hta");
+    } catch(e) {}
+  };
+
+  function dismissPopup() {
+    try { window.close(); } catch(e) {}
+    try { self.close(); } catch(e) {}
+  }
+</script>
+</head>
+<body>
+<div class="container">
+  <div class="badge">Focus Shield</div>
+  <div class="shield-ring"><span>&#128737;</span></div>
+  <h2>Access Denied</h2>
+  <div class="app-label">Spotify</div>
+  <p class="msg">This app is blocked during your focus session.<br>Stay on track and keep learning!</p>
+  <button class="btn" onclick="dismissPopup()">DISMISS</button>
+</div>
+</body>
+</html>

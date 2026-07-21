@@ -39,14 +39,15 @@
   --p-glow: rgba(9, 205, 131, 0.22);
   --p-border: rgba(9, 205, 131, 0.18);
 
-  /* Logo Context — Dark Mode (Subtle Emerald Tint) */
-  --logo-bg: radial-gradient(circle at 30% 30%, #1c252a, #0d1117);
-  --logo-text: #e0f2f1;
-  --logo-os: #80cbc4;
-  --logo-bar: #4f9a94;
-  --logo-sh: 0 4px 15px rgba(0, 0, 0, 0.5);
-  --logo-border: rgba(255, 255, 255, 0.08);
-  --logo-accent: #b2dfdb;
+  /* Logo Context — Dark Mode (Refined Obsidian + Emerald Depth) */
+  --logo-bg: radial-gradient(circle at 35% 30%, #16201b, #090e0c);
+  --logo-inner-bg: #090e0c;
+  --logo-text: #f8fafc;
+  --logo-os: #10b981;
+  --logo-bar: #34d399;
+  --logo-sh: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --logo-border: rgba(255, 255, 255, 0.12);
+  --logo-accent: #34d399;
 
   /* Text — High Contrast for Dark Mode */
   --t1: #f0f4f0;
@@ -217,14 +218,15 @@
   --p-glow: rgba(16, 185, 129, 0.1);
   --p-border: rgba(16, 185, 129, 0.15);
 
-  /* Logo Context — Light Mode (Liquid Chrome + Emerald) */
-  --logo-bg: linear-gradient(135deg, #ECFDF5, #F1F5F9);
-  --logo-text: #059669;
-  --logo-os: #0D9488;
-  --logo-bar: #10B981;
-  --logo-sh: 0 4px 12px rgba(15, 23, 42, 0.05);
-  --logo-border: rgba(15, 23, 42, 0.08);
-  --logo-accent: #10B981;
+  /* Logo Context — Light Mode (Refined Emerald + Pearl) */
+  --logo-bg: linear-gradient(135deg, #f0fdf4, #e2e8f0);
+  --logo-inner-bg: #ffffff;
+  --logo-text: #0f172a;
+  --logo-os: #059669;
+  --logo-bar: #10b981;
+  --logo-sh: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --logo-border: rgba(15, 23, 42, 0.12);
+  --logo-accent: #10b981;
 
   /* Text — Elegant Graphite contrast (no dirty green tint) */
   --t1: #0F172A;
@@ -431,10 +433,7 @@ nav,
     background-color 0.2s var(--ease),
     color 0.2s var(--ease),
     border-color 0.2s var(--ease),
-    transform 0.2s var(--ease),
-    opacity 0.2s var(--ease),
     box-shadow 0.2s var(--ease);
-  will-change: auto;
 }
 
 /* ══ Reset & Base ═══════════════════════════════ */
@@ -2034,8 +2033,9 @@ textarea.input {
     padding: 24px 16px !important;
   }
 
-  .editor-title-input {
-    font-size: 28px !important;
+  .editor-title-input,
+  .editor-title-view {
+    font-size: 28pt !important;
     margin-bottom: 20px !important;
   }
 
@@ -2586,4 +2586,793 @@ button {
     font-size: 12.5px !important;
     min-height: 38px !important;
   }
+}
+
+/* ==========================================================================
+   AXINITE OS — ADVANCED WORD PROCESSOR (GOOGLE DOCS COMPETITOR) STYLES
+   ========================================================================== */
+
+/* Outer Workspace Viewport */
+.doc-workspace {
+  display: flex;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--t1);
+  position: relative;
+}
+
+/* Document Page Themes */
+.doc-theme-obsidian {
+  --doc-bg: #0e1510;
+  --doc-text: #ffffff;
+  --doc-canvas: #080c09;
+  --doc-accent: #09cd83;
+  --doc-border: rgba(9, 205, 131, 0.15);
+  --doc-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  --doc-t-muted: #a3bda3;
+}
+
+.doc-theme-classic-light {
+  --doc-bg: #ffffff;
+  --doc-text: #1e293b;
+  --doc-canvas: #f1f5f9;
+  --doc-accent: #10b981;
+  --doc-border: #e2e8f0;
+  --doc-shadow: 0 4px 20px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+  --doc-t-muted: #64748b;
+}
+
+.doc-theme-warm-sepia {
+  --doc-bg: #f5ecd8;
+  --doc-text: #433422;
+  --doc-canvas: #fcf8f2;
+  --doc-accent: #b45309;
+  --doc-border: #ebdcb9;
+  --doc-shadow: 0 4px 24px rgba(67, 52, 34, 0.08);
+  --doc-t-muted: #85725d;
+}
+
+.doc-theme-cyberpunk {
+  --doc-bg: #13112b;
+  --doc-text: #e2e8f0;
+  --doc-canvas: #0c0b16;
+  --doc-accent: #a78bfa;
+  --doc-border: rgba(124, 58, 237, 0.25);
+  --doc-shadow: 0 8px 32px rgba(124, 58, 237, 0.15);
+  --doc-t-muted: #94a3b8;
+}
+
+/* Adaptive Document Canvas Text & Style Overrides */
+.doc-workspace .editor-title-input,
+.doc-workspace .editor-title-view {
+  color: var(--doc-text) !important;
+  font-size: 32pt !important;
+}
+.doc-workspace .editor-title-input::placeholder {
+  color: var(--doc-t-muted) !important;
+  opacity: 0.6;
+}
+.doc-page-sheet h1,
+.doc-page-sheet h2,
+.doc-page-sheet h3,
+.doc-page-sheet h4,
+.doc-page-sheet h5,
+.doc-page-sheet h6 {
+  color: var(--doc-text) !important;
+}
+
+/* Ensure all editor content layers adapt and inherit/use the theme text color */
+.doc-page-sheet .ql-container,
+.doc-page-sheet .ql-editor,
+.doc-page-sheet .ql-editor p,
+.doc-page-sheet .ql-editor li,
+.doc-page-sheet .ql-editor td,
+.doc-page-sheet .ql-editor th,
+.doc-page-sheet .ql-editor strong,
+.doc-page-sheet .ql-editor em,
+.doc-page-sheet .ql-editor h1,
+.doc-page-sheet .ql-editor h2,
+.doc-page-sheet .ql-editor h3,
+.doc-page-sheet .ql-editor h4,
+.doc-page-sheet .ql-editor h5,
+.doc-page-sheet .ql-editor h6,
+.doc-page-sheet .ql-editor span:not([style*="color:"]) {
+  color: var(--doc-text) !important;
+}
+
+/* Ensure list bullets, numbers, and checklists use correct contrast colors */
+.doc-page-sheet .ql-editor li::before {
+  color: var(--doc-text) !important;
+}
+.doc-page-sheet .ql-editor li[data-list="checked"]::before,
+.doc-page-sheet .ql-editor li[data-list="unchecked"]::before {
+  color: var(--doc-accent) !important;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease;
+  transform-origin: center;
+}
+.doc-page-sheet .ql-editor li[data-list]:hover::before {
+  transform: scale(1.25);
+}
+
+/* Document canvas link styling */
+.doc-page-sheet .ql-editor a {
+  color: var(--doc-accent) !important;
+  text-decoration: underline !important;
+}
+
+.doc-page-sheet .ql-editor.ql-blank::before {
+  color: var(--doc-t-muted) !important;
+  opacity: 0.6;
+}
+
+/* Blockquotes & code formatting rules */
+.doc-page-sheet .ql-editor blockquote {
+  border-left: 4px solid var(--doc-accent) !important;
+  padding-left: 16px !important;
+  color: var(--doc-t-muted) !important;
+  margin: 16px 0 !important;
+  font-style: italic !important;
+}
+.doc-page-sheet .ql-editor code {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--doc-accent) !important;
+  padding: 0.2em 0.4em !important;
+  border-radius: 4px !important;
+  font-family: monospace !important;
+  font-size: 0.9em !important;
+}
+.doc-theme-obsidian .doc-page-sheet .ql-editor code,
+.doc-theme-cyberpunk .doc-page-sheet .ql-editor code {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Multi-line preformatted code blocks */
+.doc-page-sheet .ql-editor pre,
+.doc-page-sheet .ql-editor pre code {
+  font-family: monospace !important;
+  font-size: 0.9em !important;
+  color: var(--doc-text) !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid var(--doc-border) !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  overflow-x: auto !important;
+  display: block !important;
+}
+.doc-theme-obsidian .doc-page-sheet .ql-editor pre,
+.doc-theme-obsidian .doc-page-sheet .ql-editor pre code,
+.doc-theme-cyberpunk .doc-page-sheet .ql-editor pre,
+.doc-theme-cyberpunk .doc-page-sheet .ql-editor pre code {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Tables custom overrides */
+.doc-page-sheet .ql-editor table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 16px 0 !important;
+  border: 1px solid var(--doc-border) !important;
+}
+.doc-page-sheet .ql-editor th,
+.doc-page-sheet .ql-editor td {
+  border: 1px solid var(--doc-border) !important;
+  padding: 8px !important;
+}
+.doc-page-sheet .ql-editor th {
+  background: var(--doc-canvas) !important;
+  font-weight: 700 !important;
+}
+
+/* Horizontal rule page breaks */
+.doc-page-sheet hr {
+  border: none !important;
+  border-top: 2px dashed var(--doc-border) !important;
+  margin: 32px 0 !important;
+}
+
+/* Document Outer Scroll Area */
+.doc-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 120px;
+  background: var(--doc-canvas);
+  transition: background 0.3s ease;
+  scrollbar-width: thin;
+}
+
+/* Page canvas Mode */
+.doc-page-mode .doc-page-sheet {
+  width: 100%;
+  max-width: 820px;
+  min-height: 1060px;
+  margin: 32px auto;
+  padding: 80px 90px;
+  background: var(--doc-bg);
+  color: var(--doc-text);
+  border: 1px solid var(--doc-border);
+  box-shadow: var(--doc-shadow);
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.doc-draft-mode .doc-page-sheet {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  background: transparent;
+  color: var(--doc-text);
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Responsive styles for page sheet */
+@media (max-width: 768px) {
+  .doc-page-mode .doc-page-sheet {
+    padding: 40px 30px !important;
+    margin: 16px auto !important;
+    min-height: auto !important;
+  }
+}
+
+/* Document Outline Left Sidebar */
+.doc-outline-panel {
+  width: 250px;
+  background: var(--s1);
+  border-right: 1px solid var(--surface-b);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: transform 0.3s var(--ease), width 0.3s var(--ease);
+}
+
+.doc-outline-item {
+  display: block;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--t3);
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 150ms ease;
+  line-height: 1.4;
+}
+
+.doc-outline-item:hover {
+  background: var(--s2);
+  color: var(--t1);
+  border-left-color: var(--surface-b);
+}
+
+.doc-outline-item.active {
+  color: var(--p) !important;
+  background: var(--p-sub);
+  border-left-color: var(--p) !important;
+  font-weight: 700;
+}
+
+.doc-outline-h1 { padding-left: 12px; font-weight: 700; font-size: 13.5px; }
+.doc-outline-h2 { padding-left: 24px; font-size: 12.5px; opacity: 0.9; }
+.doc-outline-h3 { padding-left: 36px; font-size: 11.5px; opacity: 0.8; }
+
+/* Right Panel: Comments & Tools */
+.doc-right-panel {
+  width: 380px;
+  background: var(--s1);
+  border-left: 1px solid var(--surface-b);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.3s var(--ease);
+}
+
+/* Comment System */
+.doc-comments-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.doc-comment-card {
+  background: var(--s2);
+  border: 1px solid var(--surface-b);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.doc-comment-card:hover {
+  border-color: var(--p-amber);
+}
+
+.doc-comment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.doc-comment-author-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-comment-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--p-purple);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.doc-comment-author-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--t1);
+}
+
+.doc-comment-time {
+  font-size: 10.5px;
+  color: var(--t4);
+}
+
+.doc-comment-quote {
+  font-size: 11.5px;
+  color: var(--t3);
+  font-style: italic;
+  border-left: 2px solid var(--p-amber);
+  padding-left: 8px;
+  margin: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.doc-comment-content {
+  font-size: 13px;
+  color: var(--t2);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.doc-comment-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--surface-b);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+/* Comment Selection Highlight in Editor */
+.doc-comment-highlight {
+  background: rgba(251, 191, 36, 0.25) !important;
+  border-bottom: 2px dashed var(--p-orange) !important;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.doc-comment-highlight:hover, .doc-comment-highlight.active {
+  background: rgba(251, 191, 36, 0.45) !important;
+}
+
+/* Bespoke Document Toolbar */
+.doc-sticky-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  height: 52px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--surface-b);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 6px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.doc-sticky-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.doc-toolbar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--t2);
+  background: transparent;
+  cursor: pointer;
+  transition: all 150ms ease;
+  border: 1px solid transparent;
+}
+.doc-toolbar-btn:hover {
+  background: var(--s2);
+  color: var(--t1);
+  border-color: var(--surface-b);
+}
+.doc-toolbar-btn.active {
+  background: var(--p-sub) !important;
+  color: var(--p) !important;
+  border-color: rgba(9, 205, 131, 0.2) !important;
+  font-weight: 800;
+}
+
+.doc-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--surface-b);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.doc-toolbar-select {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--t2);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 24px 4px 8px;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  
+  /* Custom chevron dropdown arrow to prevent native overlaps */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238892b0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 11px;
+}
+.doc-toolbar-select:hover {
+  background: var(--s2);
+  border-color: var(--surface-b);
+}
+[data-theme="light"] .doc-toolbar-select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+}
+.doc-toolbar-select option {
+  background: var(--s1);
+  color: var(--t1);
+}
+
+/* Color Pickers Dropdowns */
+.doc-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  padding: 8px;
+}
+.doc-color-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+.doc-color-dot:hover {
+  transform: scale(1.15);
+}
+
+/* Version History Snapshot cards */
+.doc-version-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--s2);
+  border: 1px solid var(--surface-b);
+  cursor: pointer;
+  transition: all 180ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.doc-version-item:hover {
+  border-color: var(--p);
+  background: var(--s3);
+}
+.doc-version-item.active {
+  border-color: var(--p);
+  background: var(--p-sub);
+}
+
+/* ==========================================================================
+   AXINITE OS — ADVANCED WORD PROCESSOR (POLISH & ENHANCEMENTS)
+   ========================================================================== */
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.doc-comments-container {
+  padding: 0 !important;
+}
+
+.doc-outline-h1 {
+  padding-left: 8px !important;
+  font-weight: 700 !important;
+  font-size: 13.5px !important;
+  color: var(--t1) !important;
+}
+.doc-outline-h2 {
+  padding-left: 20px !important;
+  font-weight: 500 !important;
+  font-size: 12.5px !important;
+  color: var(--t2) !important;
+  opacity: 0.9;
+}
+.doc-outline-h3 {
+  padding-left: 32px !important;
+  font-weight: 400 !important;
+  font-size: 11.5px !important;
+  color: var(--t3) !important;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.doc-draft-mode .doc-page-sheet {
+  padding: 40px 48px !important;
+}
+
+.doc-toolbar-group {
+  display: flex;
+  align-items: center;
+  background: var(--s2);
+  border: 1px solid var(--surface-b);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.doc-toolbar-group .doc-toolbar-btn {
+  border-radius: 6px;
+  border: none !important;
+  height: 28px !important;
+  width: 28px !important;
+  background: transparent;
+}
+.doc-toolbar-group .doc-toolbar-btn:hover {
+  background: var(--s3);
+  color: var(--t1);
+}
+.doc-toolbar-group .doc-toolbar-btn.active {
+  background: var(--p-sub) !important;
+  color: var(--p) !important;
+}
+
+/* Ensure all document typography elements inherit the chosen page font */
+.doc-page-sheet .ql-container,
+.doc-page-sheet .ql-editor,
+.doc-page-sheet .ql-editor p,
+.doc-page-sheet .ql-editor h1,
+.doc-page-sheet .ql-editor h2,
+.doc-page-sheet .ql-editor h3,
+.doc-page-sheet .ql-editor h4,
+.doc-page-sheet .ql-editor h5,
+.doc-page-sheet .ql-editor h6,
+.doc-page-sheet .ql-editor li,
+.doc-page-sheet .ql-editor span,
+.doc-page-sheet .ql-editor strong,
+.doc-page-sheet .ql-editor em,
+.doc-page-sheet .editor-title-input,
+.doc-page-sheet h1,
+.doc-page-sheet h2,
+.doc-page-sheet h3 {
+  font-family: inherit !important;
+}
+
+/* Print Layout overrides */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  #root > div:not(.doc-workspace),
+  .doc-sticky-toolbar,
+  .doc-outline-panel,
+  .doc-right-panel,
+  .editor-title-input,
+  .glass-panel {
+    display: none !important;
+  }
+  .doc-scroll-container {
+    background: #fff !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .doc-page-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .ql-editor {
+    color: #000 !important;
+    font-size: 12pt !important;
+  }
+}
+
+/* ══ PERFORMANCE — GPU Acceleration & Paint Optimization ════════════ */
+/* Promote frequently-animated elements to their own compositor layer */
+.card-hover,
+.icon-btn,
+.nav-link,
+.spinning,
+.sync-indicator-btn {
+  will-change: transform;
+  transform: translateZ(0); /* GPU compositing hint */
+}
+
+/* Reduce repaints on scroll containers */
+[style*="overflow: auto"],
+[style*="overflowY: auto"],
+[style*="overflow-y: auto"] {
+  contain: content;
+}
+
+/* Pause all animations when tab is not visible (saves CPU/battery) */
+.page-hidden *,
+.page-hidden *::before,
+.page-hidden *::after {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Custom Slider Input Resets ────────────────────────── */
+input[type="range"].invisible-slider {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+input[type="range"].invisible-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  height: 100% !important;
+}
+input[type="range"].invisible-slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: transparent !important;
+  border: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  cursor: pointer !important;
+}
+input[type="range"].invisible-slider::-moz-range-track {
+  background: transparent !important;
+  border: none !important;
+}
+input[type="range"].invisible-slider::-moz-range-thumb {
+  background: transparent !important;
+  border: none !important;
+  width: 20px !important;
+  height: 20px !important;
+  cursor: pointer !important;
+}
+
+input[type="range"].volume-slider {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: var(--s5) !important;
+  height: 4px !important;
+  border-radius: 99px !important;
+  outline: none !important;
+  border: none !important;
+}
+input[type="range"].volume-slider::-webkit-slider-runnable-track {
+  background: transparent !important;
+  height: 4px !important;
+  border-radius: 99px !important;
+}
+input[type="range"].volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: var(--p) !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 6px var(--p-glow) !important;
+  margin-top: -4px !important;
+  border: none !important;
+}
+input[type="range"].volume-slider::-moz-range-track {
+  background: transparent !important;
+  height: 4px !important;
+  border-radius: 99px !important;
+}
+input[type="range"].volume-slider::-moz-range-thumb {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  background: var(--p) !important;
+  border: none !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 6px var(--p-glow) !important;
+}
+
+/* ── Performance: Calibration Button Hover/Active (replaces framer-motion) ── */
+.cal-submit-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 12px 28px rgba(9, 205, 131, 0.25) !important;
+}
+.cal-submit-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* ── Performance: Layout Containment for heavy sections ── */
+.page {
+  contain: layout style;
+}
+.card {
+  contain: layout style;
 }

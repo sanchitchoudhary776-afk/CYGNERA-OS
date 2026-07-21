@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import fs from "fs";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import { promisify } from "util";
 
 const execPromise = promisify(exec);
@@ -36,6 +36,34 @@ export default defineConfig({
          *  FOCUS SHIELD – App & Website Blocker
          * ═══════════════════════════════════════════ */
         const ROOT = server.config.root;
+        const env = loadEnv(server.config.mode, ROOT, '');
+        const supabaseUrl = env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+        let devSupabase = null;
+
+        import('@supabase/supabase-js').then(({ createClient }) => {
+          if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here') {
+            devSupabase = createClient(supabaseUrl, supabaseAnonKey);
+          }
+        }).catch(err => {
+          console.error('[Dev API Proxy] Failed to load Supabase:', err);
+        });
+
+        const DEV_USER_RATE_BUCKETS = {};
+        function checkDevRateLimit(userId) {
+          const now = Date.now();
+          const windowStart = now - (5 * 60 * 60 * 1000);
+          if (!DEV_USER_RATE_BUCKETS[userId]) {
+            DEV_USER_RATE_BUCKETS[userId] = [];
+          }
+          DEV_USER_RATE_BUCKETS[userId] = DEV_USER_RATE_BUCKETS[userId].filter(ts => ts > windowStart);
+          if (DEV_USER_RATE_BUCKETS[userId].length >= 120) {
+            return false;
+          }
+          DEV_USER_RATE_BUCKETS[userId].push(now);
+          return true;
+        }
+
         const CONFIG_PATH = path.join(ROOT, 'blocked_apps.json');
         const HOSTS_PATH = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'drivers', 'etc', 'hosts');
         const HOSTS_TAG_START = '# ===AXINITE-FOCUS-SHIELD-START===';
@@ -205,70 +233,296 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
           return procs;
         }
 
-        const lastNotifiedApps = {};
+        // Valid single-word executable process names only (no spaces)
+        const PROTECTED_PROCESSES = [
+          'chrome', 'chromium',
+          'msedge',
+          'firefox',
+          'opera', 'operagx',
+          'brave',
+          'vivaldi',
+          'safari',
+          'arc',
+          'explorer', 'taskmgr', 'cmd', 'powershell', 'windowsterminal',
+          'svchost', 'csrss', 'dwm', 'winlogon', 'lsass',
+          'axinite', 'cygnera'
+        ];
+
+        // Browser process names — used to scope window-title site matching
+        const BROWSER_PROCESSES = new Set([
+          'chrome', 'chromium', 'msedge', 'firefox', 'opera', 'operagx',
+          'brave', 'vivaldi', 'safari', 'arc', 'tor'
+        ]);
+
+        function isProtectedProcess(name) {
+          const lower = (name || '').toLowerCase().replace(/\.exe$/i, '').trim();
+          return PROTECTED_PROCESSES.some(p => lower === p || lower.includes(p));
+        }
+
+        function getSiteKeywords(site) {
+          const clean = site.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase().trim();
+          const domainParts = clean.split('.');
+          const keywords = [clean];
+          if (domainParts.length >= 2) {
+            const mainName = domainParts[domainParts.length - 2];
+            if (mainName.length > 2) {
+              keywords.push(mainName);
+            }
+          }
+          return keywords;
+        }
+
+        if (!globalThis.__axiniteLastNotified) {
+          globalThis.__axiniteLastNotified = {};
+        }
+        const lastNotifiedApps = globalThis.__axiniteLastNotified;
         let isRunningCheck = false;
+
+        if (globalThis.__axiniteCheckInterval) {
+          clearInterval(globalThis.__axiniteCheckInterval);
+        }
 
         const checkInterval = setInterval(async () => {
           if (!blockerState.enabled) return;
-          if (!blockerState.blockedApps || blockerState.blockedApps.length === 0) return;
+          const hasApps = Array.isArray(blockerState.blockedApps) && blockerState.blockedApps.length > 0;
+          const hasSites = Array.isArray(blockerState.blockedSites) && blockerState.blockedSites.length > 0;
+          if (!hasApps && !hasSites) return;
           if (isRunningCheck) return;
           isRunningCheck = true;
 
           try {
-            // Native verbose tasklist for active processes only
-            const { stdout } = await execPromise('tasklist /V /FO CSV /NH /FI "STATUS eq Running"', { timeout: 8000, windowsHide: true });
-            if (!stdout || !stdout.trim()) return;
-
-            const processes = parseVerboseTasklistCSV(stdout);
-            const blockedSet = new Set(
-              blockerState.blockedApps.map(b => b.replace(/\.exe$/i, '').toLowerCase().trim())
+            const blockedAppsSet = new Set(
+              (blockerState.blockedApps || []).map(b => b.replace(/\.exe$/i, '').toLowerCase().trim())
             );
 
+            // Build a clean, validated set of process names (no spaces, no empty strings)
+            const targetNames = new Set([
+              ...Array.from(blockedAppsSet).filter(n => n && !n.includes(' ')),
+              ...PROTECTED_PROCESSES.filter(n => n && !n.includes(' '))
+            ]);
+            if (targetNames.size === 0) { isRunningCheck = false; return; }
+            // Quote each name for safe PowerShell array syntax
+            const nameFilter = Array.from(targetNames).map(n => `'${n.replace(/\.exe$/i, '')}'`).join(',');
+
+            // Fast, non-blocking PowerShell query to fetch only targeted processes
+            const { stdout } = await execPromise(
+              `powershell -NoProfile -Command "Get-Process -Name ${nameFilter} -ErrorAction SilentlyContinue | Select-Object ProcessName, Id, MainWindowTitle | ConvertTo-Json -Compress; exit 0"`,
+              { timeout: 8000, windowsHide: true }
+            );
+            if (!stdout || !stdout.trim()) return;
+
+            const parsed = JSON.parse(stdout.trim());
+            const processes = Array.isArray(parsed) ? parsed : [parsed];
+
+            const blockedSites = blockerState.blockedSites || [];
             const terminatedAppsThisTick = new Set();
 
             for (const proc of processes) {
               if (!proc || !proc.ProcessName) continue;
-              const name = proc.ProcessName.toLowerCase();
+              const procName = proc.ProcessName.toLowerCase();
+              const title = (proc.MainWindowTitle || '').toLowerCase();
+              const hasTitle = title && title.trim() !== '';
 
-              if (blockedSet.has(name)) {
-                // Only block/notify if it has a valid active window title (so tray/background helpers don't trigger alerts)
-                const title = proc.MainWindowTitle || '';
-                if (title && title !== 'N/A') {
-                  console.log(`[App Blocker] ✗ Blocked GUI app detected: ${proc.ProcessName} ("${title}", PID ${proc.Id}). Terminating...`);
+              // 1. App Blocking
+              if (blockedAppsSet.has(procName)) {
+                if (isProtectedProcess(procName)) {
+                  if (hasTitle) {
+                    const hasBannedSite = blockedSites.some(site => {
+                      const keywords = getSiteKeywords(site);
+                      return keywords.some(k => title.includes(k));
+                    });
+                    if (hasBannedSite) {
+                      console.log(`[Focus Shield] Protected process ${proc.ProcessName} has blocked site window: "${proc.MainWindowTitle}". Closing window...`);
+                      try {
+                        await execPromise(`powershell -NoProfile -Command "(Get-Process -Id ${proc.Id}).CloseMainWindow()"`, { timeout: 3000, windowsHide: true });
+                      } catch {}
+                    }
+                  }
+                } else {
+                  if (!terminatedAppsThisTick.has(procName)) {
+                    terminatedAppsThisTick.add(procName);
+                    console.log(`[Focus Shield] ✗ Blocked GUI app detected: ${proc.ProcessName}. Terminating all instances...`);
+                    try {
+                      await execPromise(`taskkill /F /IM ${procName}.exe`, { timeout: 5000, windowsHide: true });
+                    } catch {}
+                  }
+                }
+              }
+
+              // 2. Website Blocking via Window Title Match — ONLY on browser processes
+              //    This prevents false positives like closing "YouTube_Notes.docx" in Word
+              if (hasTitle && BROWSER_PROCESSES.has(procName)) {
+                const matchesBlockedSite = blockedSites.some(site => {
+                  const keywords = getSiteKeywords(site);
+                  return keywords.some(k => title.includes(k));
+                });
+
+                if (matchesBlockedSite) {
+                  console.log(`[Focus Shield] Blocked website detected in browser window: "${proc.MainWindowTitle}" (Process: ${proc.ProcessName}, PID: ${proc.Id}). Closing tab...`);
                   try {
-                    await execPromise(`taskkill /F /PID ${proc.Id}`, { timeout: 5000, windowsHide: true });
+                    await execPromise(`powershell -NoProfile -Command "(Get-Process -Id ${proc.Id}).CloseMainWindow()"`, { timeout: 3000, windowsHide: true });
                   } catch {}
-                  terminatedAppsThisTick.add(proc.ProcessName);
                 }
               }
             }
 
-            // Trigger VBScript notifications with 15-second cooldown
+            // Trigger premium decoupled HTA notification popups with 15-second cooldown
             const nowTime = Date.now();
             for (const appName of terminatedAppsThisTick) {
               const lowerName = appName.toLowerCase();
               const lastTime = lastNotifiedApps[lowerName] || 0;
               if (nowTime - lastTime > 15000) {
+                // Set the cooldown timestamp IMMEDIATELY to prevent race conditions
                 lastNotifiedApps[lowerName] = nowTime;
 
-                // Show notification via VBScript — NO console window at all
-                const safeAppName = appName.replace(/"/g, '""');
-                const vbsContent = `MsgBox "ACCESS DENIED!" & vbCrLf & vbCrLf & "${safeAppName} is blocked by Axinite OS Focus Shield." & vbCrLf & "Close this dialog and get back to your learning goals!", vbExclamation, "Axinite OS - Focus Shield"`;
+                // Format app name nicely
+                const formattedName = appName.charAt(0).toUpperCase() + appName.slice(1);
+                const safeAppName = formattedName.replace(/"/g, '\\"');
                 const sanitizedFileName = lowerName.replace(/[^a-z0-9]/g, '');
-                const vbsPath = path.join(ROOT, `.axinite-popup-${sanitizedFileName}.vbs`);
+                const htaPath = path.join(ROOT, `.axinite-popup-${sanitizedFileName}.hta`);
+                const safeHtaPath = htaPath.replace(/\\/g, '\\\\');
+                const htaContent = `
+<!DOCTYPE html>
+<html>
+<head>
+<title>Axinite OS - Focus Shield</title>
+<hta:application 
+  id="appBlockPopup"
+  applicationname="Axinite Focus Shield"
+  border="thin"
+  borderstyle="normal"
+  caption="yes"
+  contextmenu="no"
+  maximizebutton="no"
+  minimizebutton="no"
+  navigable="no"
+  scroll="no"
+  selection="no"
+  showintaskbar="yes"
+  singleinstance="no"
+  sysmenu="yes"
+  windowstate="normal"
+/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0c1120;
+    color: #e2e8f0;
+    font-family: "Segoe UI", sans-serif;
+    margin: 0; padding: 0;
+    overflow: hidden;
+  }
+  .container {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #161232 0%, #0c1120 60%);
+    padding: 30px 36px 28px;
+  }
+  .badge {
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 5px 16px;
+    border-radius: 20px;
+    margin-bottom: 20px;
+  }
+  .shield-ring {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(248, 113, 113, 0.06);
+    border: 2px solid rgba(248, 113, 113, 0.3);
+    box-shadow: 0 0 24px rgba(248, 113, 113, 0.12);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .shield-ring span { font-size: 28px; }
+  h2 {
+    font-size: 20px; font-weight: 700;
+    color: #fca5a5;
+    margin-bottom: 14px;
+  }
+  .app-label {
+    font-size: 14px; color: #f1f5f9;
+    font-weight: 600;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 7px 20px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+  .msg {
+    font-size: 12px; color: #64748b;
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+  .btn {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    padding: 10px 34px;
+    font-size: 13px; font-weight: 700;
+    border-radius: 7px;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.35);
+  }
+</style>
+<script language="JavaScript">
+  window.resizeTo(460, 380);
+  window.moveTo((screen.width - 460) / 2, (screen.height - 380) / 2);
+
+  window.onbeforeunload = function() {
+    try {
+      var fso = new ActiveXObject("Scripting.FileSystemObject");
+      fso.DeleteFile("${safeHtaPath}");
+    } catch(e) {}
+  };
+
+  function dismissPopup() {
+    try { window.close(); } catch(e) {}
+    try { self.close(); } catch(e) {}
+  }
+</script>
+</head>
+<body>
+<div class="container">
+  <div class="badge">Focus Shield</div>
+  <div class="shield-ring"><span>&#128737;</span></div>
+  <h2>Access Denied</h2>
+  <div class="app-label">${safeAppName}</div>
+  <p class="msg">This app is blocked during your focus session.<br>Stay on track and keep learning!</p>
+  <button class="btn" onclick="dismissPopup()">DISMISS</button>
+</div>
+</body>
+</html>
+                `.trim();
 
                 try {
-                  fs.writeFileSync(vbsPath, vbsContent, 'utf8');
-                  exec(`wscript.exe "${vbsPath}"`, { windowsHide: true }, () => {
-                    try { fs.unlinkSync(vbsPath); } catch {}
+                  fs.writeFileSync(htaPath, htaContent, 'utf8');
+                  console.log(`[Focus Shield] Spawning HTA popup: ${htaPath}`);
+                  const child = spawn('mshta.exe', [htaPath], {
+                    detached: true,
+                    stdio: 'ignore',
+                    windowsHide: false
                   });
-                } catch {}
+                  child.unref();
+                } catch (err) {
+                  console.error('[Focus Shield] Failed to spawn HTA popup:', err);
+                }
               }
             }
-          } catch {} finally {
+          } catch (e) {
+            console.error('[Focus Shield] Error during process check:', e);
+          } finally {
             isRunningCheck = false;
           }
         }, 2500);
+        globalThis.__axiniteCheckInterval = checkInterval;
 
         // Clean up hosts file and interval when server shuts down
         server.httpServer?.on('close', () => {
@@ -276,6 +530,24 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
           // Remove hosts entries when dev server stops
           syncHostsFile(false, []);
         });
+
+        // Graceful hosts cleanup on abnormal exit (Ctrl+C, crashes, etc.)
+        const cleanupHostsOnExit = () => {
+          try {
+            clearInterval(checkInterval);
+            syncHostsFile(false, []);
+          } catch {}
+        };
+        if (!globalThis.__axiniteExitHandlersRegistered) {
+          globalThis.__axiniteExitHandlersRegistered = true;
+          process.on('SIGINT', () => { cleanupHostsOnExit(); process.exit(0); });
+          process.on('SIGTERM', () => { cleanupHostsOnExit(); process.exit(0); });
+          process.on('exit', cleanupHostsOnExit);
+          process.on('uncaughtException', (err) => {
+            console.error('[Focus Shield] Uncaught exception, cleaning up hosts:', err.message);
+            cleanupHostsOnExit();
+          });
+        }
 
         /* ═══════════════════════════════════════════
          *  MIDDLEWARE – API Routes
@@ -325,32 +597,35 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
             return;
           }
 
-          /* ── GET /api/processes (running GUI apps) — native tasklist, no PowerShell ── */
+          /* ── GET /api/processes (running GUI apps) ── */
           if (req.url === '/api/processes' && req.method === 'GET') {
             try {
-              const { stdout } = await execPromise('tasklist /V /FO CSV /NH /FI "STATUS eq Running"', { timeout: 10000, windowsHide: true });
-              // Parse verbose tasklist CSV: "Name","PID","Session","#","Mem","Status","User","CPU","Window Title"
-              const results = [];
-              if (stdout) {
-                for (const line of stdout.split('\n')) {
-                  const t = line.trim();
-                  if (!t) continue;
-                  const parts = t.match(/"([^"]*)"/g);
-                  if (parts && parts.length >= 9) {
-                    const name = parts[0].replace(/"/g, '').replace(/\.exe$/i, '');
-                    const pid = parseInt(parts[1].replace(/"/g, ''), 10);
-                    const title = parts[8].replace(/"/g, '');
-                    if (title && title !== 'N/A') {
-                      results.push({ ProcessName: name, Id: pid, MainWindowTitle: title });
-                    }
-                  }
+              const { stdout } = await execPromise(
+                'powershell -NoProfile -Command "Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object ProcessName, Id, MainWindowTitle | ConvertTo-Json -Compress"',
+                { timeout: 8000, windowsHide: true }
+              );
+              let results = [];
+              if (stdout && stdout.trim()) {
+                try {
+                  const parsed = JSON.parse(stdout.trim());
+                  const arr = Array.isArray(parsed) ? parsed : [parsed];
+                  results = arr
+                    .filter(p => p && p.ProcessName)
+                    .map(p => ({
+                      ProcessName: p.ProcessName || '',
+                      Id: p.Id || 0,
+                      MainWindowTitle: p.MainWindowTitle || ''
+                    }));
+                } catch (parseErr) {
+                  console.warn('[Focus Shield] Failed to parse process list JSON:', parseErr.message);
                 }
               }
               res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(JSON.stringify(results));
             } catch (err) {
-              res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: err.message }));
+              // Return empty array instead of 500 when PowerShell fails
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end('[]');
             }
             return;
           }
@@ -360,11 +635,22 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
             try {
               const script = `Get-StartApps | Select-Object Name, AppID | ConvertTo-Json`;
               const { stdout } = await runPsScript(ROOT, 'installed-apps', script, { timeout: 12000 });
+              let results = '[]';
+              if (stdout && stdout.trim()) {
+                try {
+                  // Validate JSON before sending
+                  JSON.parse(stdout.trim());
+                  results = stdout.trim();
+                } catch {
+                  console.warn('[Focus Shield] Invalid JSON from Get-StartApps, returning empty.');
+                }
+              }
               res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(stdout || '[]');
+              res.end(results);
             } catch (err) {
-              res.writeHead(500, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ error: err.message }));
+              // Return empty array instead of 500 when PowerShell fails
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end('[]');
             }
             return;
           }
@@ -375,6 +661,36 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
             req.on('data', chunk => { body += chunk; });
             req.on('end', async () => {
               try {
+                let devUserId = 'anonymous_dev';
+                if (devSupabase) {
+                  const authHeader = req.headers.authorization || req.headers.Authorization || '';
+                  const token = authHeader.replace(/^Bearer /i, '').trim();
+                  if (!token) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: { message: 'Authentication required. Token missing.' } }));
+                    return;
+                  }
+                  try {
+                    const { data: { user }, error } = await devSupabase.auth.getUser(token);
+                    if (error || !user) {
+                      res.writeHead(401, { 'Content-Type': 'application/json' });
+                      res.end(JSON.stringify({ error: { message: 'Unauthorized. Invalid or expired token.' } }));
+                      return;
+                    }
+                    devUserId = user.id;
+                  } catch (err) {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: { message: 'Authentication check failed.' } }));
+                    return;
+                  }
+                }
+
+                if (!checkDevRateLimit(devUserId)) {
+                  res.writeHead(429, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: { message: 'Too many requests. Local dev backend rate limit exceeded.' } }));
+                  return;
+                }
+
                 const payload = JSON.parse(body);
                 const env = loadEnv(server.config.mode, server.config.root, '');
                 const envKey = env.GROQ_API_KEY || env.VITE_GROQ_API_KEY || '';
@@ -466,7 +782,7 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
   },
   build: {
     outDir: "dist",
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -476,6 +792,12 @@ Start-ScheduledTask -TaskName '${SCHTASK_NAME}'
             return 'charts';
           if (id.includes('node_modules/framer-motion'))
             return 'motion';
+          if (id.includes('node_modules/react-quill') || id.includes('node_modules/quill'))
+            return 'editor';
+          if (id.includes('node_modules/react-markdown') || id.includes('node_modules/remark') || id.includes('node_modules/mdast') || id.includes('node_modules/micromark'))
+            return 'markdown';
+          if (id.includes('node_modules/@supabase'))
+            return 'supabase';
         },
       },
     },

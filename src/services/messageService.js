@@ -72,7 +72,7 @@ export const messageService = {
    *
    * @returns {object} The message object (for immediate UI display)
    */
-  sendMessage(senderId, recipientId, text) {
+  sendMessage(senderId, recipientId, text, extra = {}) {
     const msg = {
       id: genMsgId(),
       sender_id: String(senderId),
@@ -80,6 +80,7 @@ export const messageService = {
       text: text.trim(),
       reactions: {},
       created_at: new Date().toISOString(),
+      ...extra,
       _pending: true, // Optimistic flag — cleared after cloud confirm
     };
 
@@ -295,6 +296,38 @@ export const messageService = {
   },
 
   /**
+   * Helper to process incoming realtime message events (inserts & updates).
+   */
+  handleRealtimePayload(payload, userId) {
+    const msg = payload.new;
+    if (!msg) return;
+
+    const cache = loadCache();
+    const key = convoKey(msg.sender_id, msg.recipient_id);
+    if (!cache[key]) cache[key] = [];
+
+    const existingIdx = cache[key].findIndex(m => m.id === msg.id);
+
+    if (payload.eventType === 'INSERT') {
+      if (existingIdx === -1) {
+        cache[key].push(msg);
+        saveCache(cache);
+      }
+    } else if (payload.eventType === 'UPDATE') {
+      if (existingIdx >= 0) {
+        cache[key][existingIdx] = { ...cache[key][existingIdx], ...msg };
+        saveCache(cache);
+      } else {
+        cache[key].push(msg);
+        saveCache(cache);
+      }
+    }
+
+    if (_onMessageCallback) _onMessageCallback(msg);
+    if (import.meta.env.DEV) console.log(`[MsgService] ⚡ Realtime ${payload.eventType} event processed for message:`, msg.id);
+  },
+
+  /**
    * Subscribe to real-time incoming messages via Supabase Realtime.
    * Calls `onMessage(msg)` whenever a new message arrives.
    */
@@ -309,28 +342,20 @@ export const messageService = {
       _realtimeChannel = supabase
         .channel('network_messages_realtime')
         .on('postgres_changes', {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'network_messages',
           filter: `recipient_id=eq.${userId}`,
         }, (payload) => {
-          const msg = payload.new;
-          if (!msg) return;
-
-          // Add to local cache
-          const cache = loadCache();
-          const key = convoKey(msg.sender_id, msg.recipient_id);
-          if (!cache[key]) cache[key] = [];
-          
-          // Deduplicate
-          if (!cache[key].find(m => m.id === msg.id)) {
-            cache[key].push(msg);
-            saveCache(cache);
-          }
-
-          // Notify UI
-          if (_onMessageCallback) _onMessageCallback(msg);
-          if (import.meta.env.DEV) console.log('[MsgService] ⚡ Realtime message received:', msg.id);
+          messageService.handleRealtimePayload(payload, userId);
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'network_messages',
+          filter: `sender_id=eq.${userId}`,
+        }, (payload) => {
+          messageService.handleRealtimePayload(payload, userId);
         })
         .subscribe((status) => {
           if (import.meta.env.DEV) console.log('[MsgService] Realtime status:', status);

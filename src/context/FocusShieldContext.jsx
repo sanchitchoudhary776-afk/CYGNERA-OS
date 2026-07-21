@@ -1,15 +1,49 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
 
 const FocusShieldCtx = createContext(null);
 
 const STORAGE_KEY = 'los_focus_shield';
 
+/* ════════════════════════════════════════════════════════════════
+ *  PROTECTED PROCESSES — browsers & system-critical apps that
+ *  must NEVER be blocked, because blocking them would kill
+ *  the browser running Axinite OS and lock the user out.
+ *  
+ *  Users who want to block content INSIDE a browser should
+ *  use the Website Blocklist instead.
+ * ════════════════════════════════════════════════════════════════ */
+const PROTECTED_PROCESSES = [
+  // Browsers — blocking any of these would kill the Axinite OS tab
+  'chrome', 'google chrome', 'chromium',
+  'msedge', 'edge', 'microsoft edge',
+  'firefox', 'mozilla firefox',
+  'opera', 'opera gx', 'operagx',
+  'brave', 'brave browser',
+  'vivaldi',
+  'safari',
+  'arc',
+  'tor browser',
+  // System-critical Windows processes
+  'explorer', 'explorer.exe',
+  'taskmgr', 'task manager',
+  'cmd', 'powershell', 'windowsterminal', 'windows terminal',
+  'svchost', 'csrss', 'dwm', 'winlogon', 'lsass',
+  // The app itself
+  'axinite', 'axinite os', 'cygnera',
+];
+
+function isProtectedProcess(name) {
+  if (!name) return false;
+  const lower = name.toLowerCase().replace(/\.exe$/i, '').trim();
+  return PROTECTED_PROCESSES.some(p => lower === p || lower.includes(p));
+}
+
 const DEFAULT_SETTINGS = {
   enabled: true,
   fullscreenLock: false,
   blockedSites: ['instagram.com', 'youtube.com', 'twitter.com', 'tiktok.com', 'facebook.com', 'reddit.com', 'snapchat.com'],
-  blockedApps: ['Discord', 'Spotify', 'Steam'], // Custom desktop apps to block on Windows
+  blockedApps: ['Discord', 'Spotify', 'Steam'], // Non-browser desktop apps only
   strictness: 'strict', // 'gentle', 'strict', 'lockdown'
 };
 
@@ -18,10 +52,13 @@ function loadSettings() {
     const s = localStorage.getItem(STORAGE_KEY);
     if (!s) return null;
     const parsed = JSON.parse(s);
+    // Auto-clean: remove any protected processes that were accidentally saved
+    const cleanedApps = (parsed.blockedApps || DEFAULT_SETTINGS.blockedApps)
+      .filter(app => !isProtectedProcess(app));
     return {
       ...DEFAULT_SETTINGS,
       ...parsed,
-      blockedApps: parsed.blockedApps || DEFAULT_SETTINGS.blockedApps,
+      blockedApps: cleanedApps,
       blockedSites: parsed.blockedSites || DEFAULT_SETTINGS.blockedSites
     };
   } catch { return null; }
@@ -29,6 +66,28 @@ function loadSettings() {
 
 function saveSettings(settings) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch {}
+}
+
+/* ═══════════════════════════════════════════════════
+ *  Safe Fullscreen Helpers
+ *  Wrap every requestFullscreen/exitFullscreen in
+ *  proper promise catch handlers to prevent unhandled
+ *  promise rejections in strict browser policies.
+ * ═══════════════════════════════════════════════════ */
+function safeRequestFullscreen() {
+  try {
+    const p = document.documentElement.requestFullscreen?.();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch {}
+}
+
+function safeExitFullscreen() {
+  try {
+    if (document.fullscreenElement) {
+      const p = document.exitFullscreen?.();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  } catch {}
 }
 
 export function FocusShieldProvider({ children }) {
@@ -49,8 +108,9 @@ export function FocusShieldProvider({ children }) {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
       }
+      // Only resume inside user-gesture context; silently catch policy errors
       if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume();
+        audioCtxRef.current.resume().catch(() => {});
       }
     } catch (e) {
       console.warn('[FocusShield] Web Audio API initialization failed:', e);
@@ -61,6 +121,10 @@ export function FocusShieldProvider({ children }) {
     try {
       if ('wakeLock' in navigator && !wakeLockRef.current) {
         wakeLockRef.current = await navigator.wakeLock.request('screen');
+        // Re-acquire if released by system (e.g. screen lock)
+        wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
       }
     } catch (err) {
       console.warn('[FocusShield] Screen Wake Lock request failed:', err);
@@ -79,12 +143,16 @@ export function FocusShieldProvider({ children }) {
 
   const startAlarm = useCallback(() => {
     if (alarmIntervalRef.current) return;
-    initAudio();
+
+    // Attempt to resume audio context (may fail if not in user-gesture)
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
     
     alarmIntervalRef.current = setInterval(() => {
       try {
         const ctx = audioCtxRef.current;
-        if (!ctx || ctx.state === 'suspended') return;
+        if (!ctx || ctx.state !== 'running') return;
         
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -105,7 +173,7 @@ export function FocusShieldProvider({ children }) {
         console.warn('[FocusShield] Sound playback failed:', e);
       }
     }, 600);
-  }, [initAudio]);
+  }, []);
 
   const stopAlarm = useCallback(() => {
     if (alarmIntervalRef.current) {
@@ -125,6 +193,10 @@ export function FocusShieldProvider({ children }) {
       if (document.hidden) {
         // User left the app
         lastHiddenAt.current = Date.now();
+        // Instantly sound alarm in background if strict or lockdown
+        if (settings.strictness === 'strict' || settings.strictness === 'lockdown') {
+          startAlarm();
+        }
       } else {
         // User returned
         if (lastHiddenAt.current) {
@@ -141,8 +213,11 @@ export function FocusShieldProvider({ children }) {
 
             // Attempt to regain fullscreen if fullscreen lock is on
             if (settings.fullscreenLock) {
-              try { document.documentElement.requestFullscreen?.(); } catch {}
+              safeRequestFullscreen();
             }
+          } else {
+            // Stop background alarm if they returned quickly (accidental exit)
+            stopAlarm();
           }
           lastHiddenAt.current = null;
         }
@@ -151,7 +226,7 @@ export function FocusShieldProvider({ children }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [isActive, settings.enabled, settings.strictness, settings.fullscreenLock]);
+  }, [isActive, settings.enabled, settings.strictness, settings.fullscreenLock, startAlarm, stopAlarm]);
 
   // Fullscreen lock on activation + show blocking prompt if user presses Esc
   useEffect(() => {
@@ -161,7 +236,7 @@ export function FocusShieldProvider({ children }) {
     }
 
     // Enter fullscreen initially
-    try { document.documentElement.requestFullscreen?.(); } catch {}
+    safeRequestFullscreen();
 
     const handleFullscreenChange = () => {
       // If we're supposed to be in fullscreen but user exited (e.g. pressed Esc)
@@ -180,9 +255,7 @@ export function FocusShieldProvider({ children }) {
 
   // Callback for the user to click to re-enter fullscreen (valid user gesture)
   const reEnterFullscreen = useCallback(() => {
-    try {
-      document.documentElement.requestFullscreen?.();
-    } catch {}
+    safeRequestFullscreen();
     setShowFullscreenPrompt(false);
   }, []);
 
@@ -206,6 +279,7 @@ export function FocusShieldProvider({ children }) {
     setViolations(0);
     setSessionViolations([]);
     setShowShield(false);
+    setShowFullscreenPrompt(false);
     lastHiddenAt.current = null;
     initAudio();
     acquireWakeLock();
@@ -214,13 +288,12 @@ export function FocusShieldProvider({ children }) {
   const deactivateShield = useCallback(() => {
     setIsActive(false);
     setShowShield(false);
+    setShowFullscreenPrompt(false);
     lastHiddenAt.current = null;
     stopAlarm();
     releaseWakeLock();
     // Exit fullscreen if we entered it
-    if (document.fullscreenElement) {
-      try { document.exitFullscreen?.(); } catch {}
-    }
+    safeExitFullscreen();
   }, [stopAlarm, releaseWakeLock]);
 
   const syncWithBackend = useCallback(async (enabled, apps, sites) => {
@@ -247,6 +320,10 @@ export function FocusShieldProvider({ children }) {
   const dismissShield = useCallback(() => {
     setShowShield(false);
     stopAlarm();
+    // Resume audio context on user gesture (dismiss click) for future alarms
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
   }, [stopAlarm]);
 
   // Sync wake lock when tab returns to visibility
@@ -274,6 +351,11 @@ export function FocusShieldProvider({ children }) {
     return () => {
       stopAlarm();
       releaseWakeLock();
+      // Clean up audio context
+      if (audioCtxRef.current) {
+        try { audioCtxRef.current.close(); } catch {}
+        audioCtxRef.current = null;
+      }
     };
   }, [stopAlarm, releaseWakeLock]);
 
@@ -299,8 +381,19 @@ export function FocusShieldProvider({ children }) {
   }, []);
 
   const addBlockedApp = useCallback((app) => {
-    const cleaned = app.replace(/\.exe$/i, '').trim();
+    // Normalize: strip .exe, extra whitespace, and common path prefixes
+    const cleaned = app.replace(/\.exe$/i, '').replace(/^.*[\\\/]/, '').trim();
     if (!cleaned) return;
+
+    // SAFETY: Prevent blocking browsers and system-critical processes
+    if (isProtectedProcess(cleaned)) {
+      toast.error(
+        `⚠️ Cannot block "${cleaned}" — it's a browser or system process. Blocking it would crash Axinite OS. Use the Website Blocklist instead to block specific sites inside the browser.`,
+        { duration: 6000 }
+      );
+      return;
+    }
+
     setSettings(prev => ({
       ...prev,
       blockedApps: prev.blockedApps.some(a => a.toLowerCase() === cleaned.toLowerCase())
@@ -318,7 +411,7 @@ export function FocusShieldProvider({ children }) {
     toast.success(`Unblocked application: ${app}`);
   }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     settings,
     isActive,
     showShield,
@@ -334,7 +427,10 @@ export function FocusShieldProvider({ children }) {
     removeBlockedSite,
     addBlockedApp,
     removeBlockedApp,
-  };
+    isProtectedProcess,
+  }), [settings, isActive, showShield, showFullscreenPrompt, violations, sessionViolations,
+       reEnterFullscreen, activateShield, deactivateShield, dismissShield, updateSettings,
+       addBlockedSite, removeBlockedSite, addBlockedApp, removeBlockedApp]);
 
   return <FocusShieldCtx.Provider value={value}>{children}</FocusShieldCtx.Provider>;
 }
@@ -344,3 +440,6 @@ export const useFocusShield = () => {
   if (!ctx) throw new Error('useFocusShield must be inside FocusShieldProvider');
   return ctx;
 };
+
+// Export for use in other components
+export { PROTECTED_PROCESSES, isProtectedProcess };

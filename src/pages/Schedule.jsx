@@ -6,10 +6,14 @@ import { SUBJECT_COLORS, SUBJECTS, fmt } from '@utils';
 import toast from 'react-hot-toast';
 import { usePremium, Counter } from '@components/ui/PremiumUI';
 import { Portal } from '@components/ui';
+import { useIsMobile } from '@utils/platform';
+
+import DesktopSchedule from './Schedule/DesktopSchedule';
+import MobileSchedule  from './Schedule/MobileSchedule';
 
 const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const DAYS_FULL  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const HOURS      = ['06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22'];
+const HOURS      = ['05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','00','01','02','03','04'];
 const DURATIONS  = [30,45,60,90,120];
 
 function getWeekDates() {
@@ -22,17 +26,10 @@ function getWeekDates() {
 }
 
 // ── Add Session Modal ─────────────────────────
-function AddModal({ onClose, onSave, defaultDay }) {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
+function AddModal({ onClose, onSave, defaultDay, defaultTime, isMobile }) {
   const today = new Date().toISOString().slice(0,10);
   const [form, setForm] = useState({
-    subject:'Web Dev', topic:'', startTime:'09:00',
+    subject:'Web Dev', topic:'', startTime: defaultTime || '09:00',
     durationMinutes:60, day: defaultDay || today,
   });
   const set = k => e => setForm(p=>({...p,[k]:e.target.value}));
@@ -74,20 +71,39 @@ function AddModal({ onClose, onSave, defaultDay }) {
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 10 : 12 }}>
             <div>
               <label className="label">Start Time</label>
-              <select className="input" value={form.startTime} onChange={set('startTime')}>
+              <select className="input" value={form.startTime} onChange={set('startTime')} style={{ height: '40px' }}>
                 {HOURS.flatMap(h=>[':00',':30'].map(m=><option key={h+m} value={`${h}${m}`}>{h}{m}</option>))}
               </select>
             </div>
             <div>
-              <label className="label">Duration</label>
-              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-                {DURATIONS.map(d=>(
-                  <button key={d} onClick={()=>setForm(p=>({...p,durationMinutes:d}))}
-                    style={{ flex: 1, padding: isMobile ? '7px 4px' : '10px 4px', borderRadius: 'var(--r-md)', border: `1px solid ${form.durationMinutes===d?'var(--p)':'var(--surface-b)'}`, background: form.durationMinutes===d?'rgba(9,205,131,0.10)':'transparent', color: form.durationMinutes===d?'var(--p)':'var(--t4)', cursor: 'pointer', fontSize: isMobile ? 10 : 11, fontWeight: 700, transition: 'all 150ms ease' }}>
-                    {d<60?`${d}m`:`${d/60}h`}
-                  </button>
-                ))}
+              <label className="label">Duration (minutes)</label>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input 
+                  type="number" 
+                  min="5" 
+                  max="1440" 
+                  className="input" 
+                  placeholder="Minutes"
+                  style={{ width: '90px', height: '40px', flexShrink: 0 }}
+                  value={form.durationMinutes} 
+                  onChange={e => {
+                    const val = Math.max(1, parseInt(e.target.value) || 0);
+                    setForm(p => ({ ...p, durationMinutes: val }));
+                  }} 
+                />
+                <span style={{ fontSize: 12, color: 'var(--t3)', fontWeight: 600 }}>mins</span>
               </div>
+            </div>
+          </div>
+          <div>
+            <label className="label" style={{ marginBottom: 6 }}>Quick Durations</label>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {DURATIONS.map(d=>(
+                <button key={d} type="button" onClick={()=>setForm(p=>({...p,durationMinutes:d}))}
+                  style={{ flex: 1, padding: isMobile ? '7px 4px' : '10px 4px', borderRadius: 'var(--r-md)', border: `1px solid ${form.durationMinutes===d?'var(--p)':'var(--surface-b)'}`, background: form.durationMinutes===d?'rgba(9,205,131,0.10)':'transparent', color: form.durationMinutes===d?'var(--p)':'var(--t4)', cursor: 'pointer', fontSize: isMobile ? 10 : 11, fontWeight: 700, transition: 'all 150ms ease' }}>
+                  {d<60?`${d}m`:`${d/60}h`}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -102,41 +118,17 @@ function AddModal({ onClose, onSave, defaultDay }) {
   );
 }
 
-// ── Session Pill (in calendar) ────────────────
-function SessionPill({ session, onDelete }) {
-  const color   = SUBJECT_COLORS[session.subject] || 'var(--p)';
-  const [h,m]   = session.startTime.split(':').map(Number);
-  const topPx   = (h - 6) * 64 + (m/60)*64;
-  const heightPx= Math.max((session.durationMinutes / 60) * 64, 28);
-
-  return (
-    <div onClick={e=>{ e.stopPropagation(); if(window.confirm(`Delete "${session.topic}"?`)) onDelete(session.id); }}
-      style={{ position:'absolute', left:2, right:2, top:`${topPx}px`, height:`${heightPx}px`, background:`${color}18`, border:`1px solid ${color}45`, borderLeft:`3px solid ${color}`, borderRadius:'var(--r-sm)', padding:'3px 7px', cursor:'pointer', overflow:'hidden', transition:'all 200ms ease', zIndex:2 }}
-      onMouseEnter={e=>{ e.currentTarget.style.background=`${color}28`; e.currentTarget.style.boxShadow=`0 4px 12px ${color}30`; }}
-      onMouseLeave={e=>{ e.currentTarget.style.background=`${color}18`; e.currentTarget.style.boxShadow='none'; }}>
-      <p style={{ fontSize:11,fontWeight:700,color,lineHeight:1.2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{session.subject}</p>
-      {heightPx>44 && <p style={{ fontSize:10,color:'var(--t3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{session.topic}</p>}
-      {heightPx>62 && <p style={{ fontSize:10,color:'var(--t4)' }}>{session.startTime} · {session.durationMinutes}m</p>}
-    </div>
-  );
-}
-
 export default function Schedule() {
   const { schedule, tasks, A } = useApp();
   const { askConfirm } = usePremium();
+  const isMobile = useIsMobile();
   const [showAdd,  setShowAdd]  = useState(false);
   const [selDay,   setSelDay]   = useState(null);
+  const [selTime,  setSelTime]  = useState(null);
   const [aiLoad,   setAiLoad]   = useState(false);
   const weekDates = getWeekDates();
   const today     = new Date().toISOString().slice(0,10);
   const [activeMobileDay, setActiveMobileDay] = useState(today);
-
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const sessionsForDay = day => schedule.filter(s=>s.day===day).sort((a,b)=>a.startTime.localeCompare(b.startTime));
 
@@ -147,7 +139,6 @@ export default function Schedule() {
   }, [schedule, weekDates]);
 
   const todaySessions = sessionsForDay(today);
-  const activeMobileSessions = sessionsForDay(activeMobileDay);
 
   const handleAI = async () => {
     if (!AI.enabled()) { toast('Add API key for AI ✦',{icon:'🔑'}); return; }
@@ -175,6 +166,18 @@ export default function Schedule() {
     setAiLoad(false);
   };
 
+  // Unified handler: opens the AddModal with a day/time prefilled
+  const handleAddSession = (day, time) => {
+    setSelDay(day);
+    setSelTime(time);
+    setShowAdd(true);
+  };
+
+  const handleDeleteSession = (id) => {
+    A.schedule.remove(id);
+    toast.success('Removed');
+  };
+
   return (
     <div className="page">
       <style>{`
@@ -182,60 +185,20 @@ export default function Schedule() {
         @keyframes fadeIn{from{opacity:0}to{opacity:1}}
         @keyframes modalCenterIn{from{opacity:0;transform:scale(0.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
         
-        .mobile-calendar-nav {
-          display: none;
-          gap: 8px;
-          overflow-x: auto;
-          padding: 4px 0 12px;
-          margin-bottom: 16px;
-          scrollbar-width: none;
-          -webkit-overflow-scrolling: touch;
-        }
-        .mobile-calendar-nav::-webkit-scrollbar {
-          display: none;
-        }
-        .mobile-calendar-nav-item {
-          flex: 0 0 calc((100% - 48px) / 7);
-          min-width: 44px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 10px 4px;
-          border-radius: 16px;
-          background: var(--s2);
-          border: 1px solid var(--surface-b);
+        .calendar-hour-cell {
+          position: absolute;
+          left: 0;
+          right: 0;
           cursor: pointer;
-          transition: all 0.2s var(--bounce);
+          z-index: 1;
+          transition: background 150ms ease;
         }
-        .mobile-calendar-nav-item.active {
-          background: var(--p-sub);
-          border-color: var(--p);
-          transform: scale(1.05);
-          box-shadow: 0 4px 15px rgba(9, 205, 131, 0.15);
-        }
-        .mobile-timeline {
-          display: none;
-          flex-direction: column;
-          gap: 12px;
-        }
-        
-        @media (max-width: 768px) {
-          .stats-grid-responsive {
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 6px !important;
-          }
-          .mobile-calendar-nav {
-            display: flex;
-          }
-          .mobile-timeline {
-            display: flex;
-          }
-          .desktop-only-calendar {
-            display: none !important;
-          }
+        .calendar-hour-cell:hover {
+          background: rgba(9, 205, 131, 0.04);
         }
       `}</style>
 
+      {/* Header: Title + AI + Add */}
       <div className="fadeup" style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:'var(--gap)',marginBottom:12,flexWrap:'wrap' }}>
         <div>
           <h1 className="shimmer-text page-title">Schedule</h1>
@@ -249,14 +212,14 @@ export default function Schedule() {
               AI Schedule
             </button>
           )}
-          <button onClick={()=>{ setSelDay(activeMobileDay); setShowAdd(true); }} className="btn btn-primary">
+          <button onClick={()=> handleAddSession(isMobile ? activeMobileDay : today, null)} className="btn btn-primary">
             <span className="material-symbols-outlined" style={{ fontSize:18 }}>add</span>Add Session
           </button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="stats-grid-responsive" style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:isMobile ? 6 : 8,marginBottom:20 }}>
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap: isMobile ? 6 : 8,marginBottom:20 }}>
         {[
           { l:'Weekly (h)',   v:Math.round(totalMins/60), c:'var(--p)',   icon:'schedule'        },
           { l:'Sessions',    v:schedule.filter(s=>{ const w=weekDates[0].toISOString().slice(0,10); return s.day>=w; }).length, c:'#60a5fa', icon:'event' },
@@ -270,140 +233,33 @@ export default function Schedule() {
         ))}
       </div>
 
-      {/* Mobile-Native Day Picker Navigation */}
-      <div className="mobile-calendar-nav fadeup d3">
-        {weekDates.map((d, i) => {
-          const dayKey = d.toISOString().slice(0, 10);
-          const isActive = dayKey === activeMobileDay;
-          const isT = dayKey === today;
-          const count = sessionsForDay(dayKey).length;
+      {/* ── View Bifurcation ─────────────────────── */}
+      {isMobile ? (
+        <MobileSchedule
+          weekDates={weekDates}
+          sessionsForDay={sessionsForDay}
+          today={today}
+          HOURS={HOURS}
+          DAYS_SHORT={DAYS_SHORT}
+          DAYS_FULL={DAYS_FULL}
+          onDeleteSession={handleDeleteSession}
+          onAddSession={handleAddSession}
+          activeMobileDay={activeMobileDay}
+          setActiveMobileDay={setActiveMobileDay}
+        />
+      ) : (
+        <DesktopSchedule
+          weekDates={weekDates}
+          sessionsForDay={sessionsForDay}
+          today={today}
+          HOURS={HOURS}
+          DAYS_SHORT={DAYS_SHORT}
+          onDeleteSession={handleDeleteSession}
+          onAddSession={handleAddSession}
+        />
+      )}
 
-          return (
-            <div
-              key={i}
-              className={`mobile-calendar-nav-item ${isActive ? 'active' : ''}`}
-              onClick={() => setActiveMobileDay(dayKey)}
-            >
-              <span style={{ fontSize: 9, fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--p)' : 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {DAYS_SHORT[i]}
-              </span>
-              <div style={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: isT ? 'var(--p)' : 'transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '4px 0',
-                boxShadow: isT ? '0 0 8px rgba(9,205,131,0.4)' : 'none'
-              }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: isT ? 'var(--bg-deep)' : (isActive ? 'var(--p)' : 'var(--t2)') }}>
-                  {d.getDate()}
-                </span>
-              </div>
-              {count > 0 && (
-                <div style={{ width: 4, height: 4, borderRadius: '50%', background: isActive ? 'var(--p)' : 'var(--t4)', marginTop: 2 }} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Mobile Timeline View */}
-      <div className="mobile-timeline fadeup d4">
-        <div className="card" style={{ padding: 18, background: 'var(--s2)', border: '1px solid var(--surface-b)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <p className="section-label" style={{ margin: 0 }}>
-              {activeMobileDay === today ? "Today's Timeline" : `${DAYS_FULL[new Date(activeMobileDay).getDay() === 0 ? 6 : new Date(activeMobileDay).getDay() - 1]}'s Timeline`}
-            </p>
-            <span style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 700 }}>{activeMobileSessions.length} sessions</span>
-          </div>
-
-          {activeMobileSessions.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {activeMobileSessions.map(s => {
-                const c = SUBJECT_COLORS[s.subject] || 'var(--p)';
-                return (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 'var(--r-md)', background: 'var(--s3)', borderLeft: `3px solid ${c}` }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)', minWidth: 42, fontVariantNumeric: 'tabular-nums' }}>{s.startTime}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{s.topic}</p>
-                      <p style={{ fontSize: 11, color: c, margin: '2px 0 0' }}>{s.subject} · {s.durationMinutes}m</p>
-                    </div>
-                    <button onClick={async () => { if (await askConfirm('Remove session?', `Delete "${s.topic}"?`)) { A.schedule.remove(s.id); toast.success('Removed'); } }} className="icon-btn" style={{ width: 28, height: 28, opacity: 0.45 }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '24px 12px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--t4)', opacity: 0.5, marginBottom: 8 }}>event_note</span>
-              <p style={{ fontSize: 12, color: 'var(--t4)', margin: 0 }}>No sessions scheduled for this day</p>
-              <button
-                onClick={() => { setSelDay(activeMobileDay); setShowAdd(true); }}
-                style={{ background: 'none', border: 'none', color: 'var(--p)', fontSize: 12, fontWeight: 800, marginTop: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>add</span>
-                Schedule one now
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Week Calendar - Desktop Only */}
-      <div className="card fadeup d4 desktop-only-calendar" style={{ padding:0,overflow:'hidden' }}>
-        {/* Day headers */}
-        <div style={{ display:'grid',gridTemplateColumns:'48px repeat(7,1fr)',borderBottom:'1px solid var(--surface-b)' }}>
-          <div style={{ padding:'12px 6px' }}/>
-          {weekDates.map((d,i) => {
-            const isT = d.toISOString().slice(0,10)===today;
-            return (
-              <div key={i} style={{ padding:'10px 4px',textAlign:'center',borderLeft:'1px solid var(--surface-b)' }}>
-                <p style={{ fontSize:10,fontWeight:700,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'0.05em' }}>{DAYS_SHORT[i]}</p>
-                <div style={{ width:28,height:28,borderRadius:'50%',margin:'4px auto 0',background:isT?'var(--p)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:isT?'0 0 12px rgba(9,205,131,0.5)':'none' }}>
-                  <p style={{ fontSize:13,fontWeight:800,color:isT?'var(--bg-deep)':'var(--t2)' }}>{d.getDate()}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Time grid */}
-        <div style={{ overflowY:'auto',maxHeight:520,overflowX:'auto' }}>
-          <div style={{ display:'grid',gridTemplateColumns:'48px repeat(7,minmax(80px,1fr))',minWidth:640 }}>
-            {/* Hour labels */}
-            <div>
-              {HOURS.map(h => (
-                <div key={h} style={{ height:64,display:'flex',alignItems:'flex-start',padding:'4px 8px 0',borderBottom:'1px solid var(--surface-b)' }}>
-                  <span style={{ fontSize:9.5,color:'var(--t4)',fontWeight:600,fontVariantNumeric:'tabular-nums' }}>{h}:00</span>
-                </div>
-              ))}
-            </div>
-            {/* Day columns */}
-            {weekDates.map((d,i) => {
-              const dayKey  = d.toISOString().slice(0,10);
-              const isToday = dayKey===today;
-              const daySess = sessionsForDay(dayKey);
-              return (
-                <div key={i}
-                  style={{ borderLeft:'1px solid var(--surface-b)',position:'relative',height:`${HOURS.length*64}px`,background:isToday?'rgba(9,205,131,0.018)':'transparent',cursor:'pointer' }}
-                  onClick={()=>{ setSelDay(dayKey); setShowAdd(true); }}>
-                  {/* Grid lines */}
-                  {HOURS.map((_,ti) => <div key={ti} style={{ position:'absolute',top:`${ti*64}px`,left:0,right:0,height:64,borderBottom:'1px solid var(--surface-b)' }}/>)}
-                  {/* Sessions */}
-                  {daySess.map(s => <SessionPill key={s.id} session={s} onDelete={id=>{ A.schedule.remove(id); toast.success('Removed'); }}/>)}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {showAdd && <Portal><AddModal onClose={()=>{ setShowAdd(false); setSelDay(null); }} onSave={A.schedule.add} defaultDay={selDay}/></Portal>}
+      {showAdd && <Portal><AddModal onClose={()=>{ setShowAdd(false); setSelDay(null); setSelTime(null); }} onSave={A.schedule.add} defaultDay={selDay} defaultTime={selTime} isMobile={isMobile}/></Portal>}
     </div>
   );
 }

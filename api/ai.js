@@ -1,5 +1,6 @@
 // Server-side Groq AI proxy with smart key rotation and retries.
 // This runs on Vercel's backend, keeping API keys completely protected and secure.
+import { createClient } from '@supabase/supabase-js';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -16,14 +17,47 @@ const markKeyUnhealthy = (key, durationMs = 5 * 60 * 1000) => {
   KEY_HEALTH[key] = Date.now() + durationMs;
 };
 
+// Supabase client initialization
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+let supabase = null;
+
+if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your_supabase_url_here') {
+  try {
+    supabase = createClient(supabaseUrl, supabaseAnonKey);
+  } catch (err) {
+    console.error('[AI Backend] Supabase initialization failed:', err);
+  }
+}
+
+// In-memory rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 60 * 1000; // 5 hours
+const RATE_LIMIT_MAX = 120; // 120 requests per 5 hours per user
+const USER_RATE_BUCKETS = {}; // userId -> array of timestamps
+
+function checkBackendRateLimit(userId) {
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+  if (!USER_RATE_BUCKETS[userId]) {
+    USER_RATE_BUCKETS[userId] = [];
+  }
+  USER_RATE_BUCKETS[userId] = USER_RATE_BUCKETS[userId].filter(ts => ts > windowStart);
+  if (USER_RATE_BUCKETS[userId].length >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  USER_RATE_BUCKETS[userId].push(now);
+  return true;
+}
+
 export default async function handler(req, res) {
   // Handle CORS and preflight requests
+  const origin = req.headers.origin || '*';
   res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   );
 
   if (req.method === 'OPTIONS') {
@@ -33,6 +67,34 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') {
     res.status(405).json({ error: { message: 'Method Not Allowed' } });
+    return;
+  }
+
+  // 1. Authenticate using Supabase JWT if configured
+  let userId = 'anonymous_dev';
+  if (supabase) {
+    const authHeader = req.headers.authorization || req.headers.Authorization || '';
+    const token = authHeader.replace(/^Bearer /i, '').trim();
+    if (!token) {
+      res.status(401).json({ error: { message: 'Authentication required. Access token missing.' } });
+      return;
+    }
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser(token);
+      if (error || !user) {
+        res.status(401).json({ error: { message: 'Unauthorized. Invalid or expired token.' } });
+        return;
+      }
+      userId = user.id;
+    } catch (err) {
+      res.status(401).json({ error: { message: 'Authentication failed.' } });
+      return;
+    }
+  }
+
+  // 2. Perform backend rate limiting
+  if (!checkBackendRateLimit(userId)) {
+    res.status(429).json({ error: { message: 'Too many requests. Backend rate limit exceeded.' } });
     return;
   }
 

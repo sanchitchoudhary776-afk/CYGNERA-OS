@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useApp } from '@context/AppContext';
 import { progressInsights, generateDailyReport, achievementMsg, moodCoaching, AI } from '@services/ai';
@@ -6,8 +6,9 @@ import { PersonalizationEngine } from '@services/personalization';
 import { SUBJECT_COLORS, overallProgress, fmt } from '@utils';
 import { usePremium, Counter, Reveal } from '@components/ui/PremiumUI';
 import { useTheme } from '@context/ThemeContext';
-import { motion, AnimatePresence } from 'framer-motion';
+
 import toast from 'react-hot-toast';
+import { useIsMobile } from '@utils/platform';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const CATS = ['All', 'Notes', 'Streak', 'Tasks', 'Focus', 'Hours', 'Paths'];
@@ -48,7 +49,7 @@ function Slider({ icon, label, val, onChange, min, max, step=1, color='var(--p)'
       </div>
       <div style={{ position:'relative', height:8, background:'var(--s5)', borderRadius:99, border:'1px solid var(--surface-b)' }}>
         <div style={{ position:'absolute', left:0, height:'100%', width:`${pct}%`, background:`linear-gradient(90deg, color-mix(in srgb, ${color} 25%, transparent), ${color})`, borderRadius:99, boxShadow:`0 0 12px color-mix(in srgb, ${color} 40%, transparent)`, transition:'width 0.15s cubic-bezier(0.4, 0, 0.2, 1)' }}/>
-        <input type="range" min={min} max={max} step={step} value={val}
+        <input type="range" className="invisible-slider" min={min} max={max} step={step} value={val}
           onChange={e=>onChange(Number(e.target.value))}
           style={{ position:'absolute', inset:0, width:'100%', opacity:0, cursor:'pointer', zIndex:2 }}/>
         <div style={{ position:'absolute', top:'50%', left:`${pct}%`, transform:'translate(-50%,-50%)', width:20, height:20, borderRadius:'50%', background:color, border:'3px solid var(--s1)', boxShadow:`0 4px 12px color-mix(in srgb, ${color} 50%, transparent)`, pointerEvents:'none', transition:'left 0.15s cubic-bezier(0.4, 0, 0.2, 1)' }}/>
@@ -62,7 +63,7 @@ function Slider({ icon, label, val, onChange, min, max, step=1, color='var(--p)'
 }
 
 // ── Circular Ring ─────────────────────────────
-function Ring({ pct = 0, size = 180, stroke = 12, color = 'var(--p)', children }) {
+const Ring = memo(function Ring({ pct = 0, size = 180, stroke = 12, color = 'var(--p)', children }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const offset = c - (Math.min(pct, 100) / 100) * c;
@@ -79,14 +80,24 @@ function Ring({ pct = 0, size = 180, stroke = 12, color = 'var(--p)', children }
       </div>
     </div>
   );
-}
+})
 
 // ── Activity Bar (pill) ───────────────────────
-function PillBars({ data, total }) {
+const PillBars = memo(function PillBars({ data, total }) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const chartRef = useRef(null);
   const { theme } = useTheme();
   const isDark = theme !== 'light';
+
+  // Guard: empty or missing data — show an empty-state placeholder
+  if (!Array.isArray(data) || data.length < 2) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 210, borderRadius: 24, background: isDark ? '#0B0E14' : '#f8faf8', border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)'}` }}>
+        <p style={{ fontSize: 13, color: 'var(--t4)', fontWeight: 600 }}>No activity data yet — start studying to see your velocity chart</p>
+      </div>
+    );
+  }
+
   const max = Math.max(...data.map(d => d.v), 8) * 1.4;
   const todayIdx = (new Date().getDay() + 6) % 7;
 
@@ -157,20 +168,18 @@ function PillBars({ data, total }) {
         {/* Technical Dotted Grid */}
         <div style={{ position: 'absolute', inset: 0, backgroundImage: `radial-gradient(${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)'} 1px, transparent 1px)`, backgroundSize: '24px 24px' }} />
 
-        {/* Atmospheric Cursor Glow */}
-        <AnimatePresence>
-          {hoverIdx !== null && (
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{
-                position: 'absolute', width: 300, height: 300,
-                background: 'radial-gradient(circle, rgba(167,139,250,0.05) 0%, transparent 70%)',
-                left: `calc(${(hoverIdx / (data.length - 1)) * 100}% - 150px)`, top: `calc(${interactionPts[hoverIdx].y}% - 150px)`,
-                pointerEvents: 'none', zIndex: 0
-              }}
-            />
-          )}
-        </AnimatePresence>
+        {/* Atmospheric Cursor Glow — pure CSS transition */}
+        <div
+          style={{
+            position: 'absolute', width: 300, height: 300,
+            background: 'radial-gradient(circle, rgba(167,139,250,0.05) 0%, transparent 70%)',
+            left: hoverIdx !== null ? `calc(${(hoverIdx / (data.length - 1)) * 100}% - 150px)` : '50%',
+            top: hoverIdx !== null ? `calc(${interactionPts[hoverIdx]?.y || 50}% - 150px)` : '50%',
+            pointerEvents: 'none', zIndex: 0,
+            opacity: hoverIdx !== null ? 1 : 0,
+            transition: 'opacity 200ms ease, left 150ms ease-out, top 150ms ease-out'
+          }}
+        />
 
         <div style={{ position: 'absolute', inset: 0, background: `radial-gradient(circle at 50% 50%, ${isDark ? 'rgba(0,255,153,0.02)' : 'rgba(4,120,87,0.05)'} 0%, transparent 100%)`, zIndex: 0 }} />
 
@@ -202,89 +211,87 @@ function PillBars({ data, total }) {
           <path d={currentPath} fill="none" stroke={isDark ? '#fff' : '#065F46'} strokeWidth="0.4" strokeOpacity={isDark ? '0.25' : '0.15'} />
         </svg>
 
-        {/* Kinetic True-Sphere Glass Bead Slider */}
+        {/* Kinetic Glass Bead Slider — CSS transition (GPU-accelerated) */}
         {(() => {
           const activeIdx = hoverIdx !== null ? hoverIdx : todayIdx;
           const pt = interactionPts[activeIdx];
           const isSelection = hoverIdx !== null;
           const primaryColor = isSelection ? '#A78BFA' : '#00FF99';
           return (
-            <motion.div
-              animate={{ left: `${pt.x}%`, top: `${pt.y}%` }}
-              transition={{ type: 'spring', stiffness: 180, damping: 24 }}
+            <div
               style={{
                 position: 'absolute', width: 16, height: 16,
                 borderRadius: '50%', zIndex: 10, pointerEvents: 'none',
+                left: `${pt.x}%`,
+                top: `${pt.y}%`,
                 transform: 'translate(-50%, -50%)',
+                transition: 'left 180ms ease-out, top 180ms ease-out',
                 background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.1) 40%, ${primaryColor}1a 100%)`,
                 boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 15px ${primaryColor}33`,
                 border: '1px solid rgba(255,255,255,0.4)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)'
               }}
             >
-              {/* Spectral Core Shift */}
-              <motion.div
-                animate={{ background: `linear-gradient(135deg, ${primaryColor} 0%, #A78BFA 100%)` }}
-                style={{ position: 'absolute', inset: 0, borderRadius: '50%', opacity: 0.3, zIndex: -1 }}
+              {/* Spectral Core */}
+              <div
+                style={{
+                  position: 'absolute', inset: 0, borderRadius: '50%', opacity: 0.3, zIndex: -1,
+                  background: `linear-gradient(135deg, ${primaryColor} 0%, #A78BFA 100%)`,
+                  transition: 'background 200ms ease'
+                }}
               />
-              <div style={{ position: 'absolute', top: '20%', left: '20%', width: 3, height: 3, borderRadius: '50%', background: '#fff', opacity: 0.8, filter: 'blur(0.5px)' }} />
-            </motion.div>
+              <div style={{ position: 'absolute', top: '20%', left: '20%', width: 3, height: 3, borderRadius: '50%', background: '#fff', opacity: 0.8 }} />
+            </div>
           );
         })()}
 
-        <AnimatePresence>
-          {hoverIdx !== null && (
-            <motion.div
-              initial={{ opacity: 0, y: 15, scale: 0.8 }}
-              animate={{
-                opacity: 1, y: 0, scale: 1,
-                left: `${(hoverIdx / (data.length - 1)) * 94 + 3}%`,
-                top: `${interactionPts[hoverIdx].y - 55}%`,
-                translateX: hoverIdx < 2 ? '0%' : hoverIdx > 4 ? '-100%' : '-50%'
-              }}
-              exit={{ opacity: 0, y: 15, scale: 0.8 }}
-              style={{
-                position: 'absolute', width: 90, padding: '10px', borderRadius: 14,
-                background: isDark ? 'rgba(11, 14, 20, 0.95)' : 'rgba(255,255,255,0.95)', backdropFilter: 'blur(24px)',
-                border: isDark ? '1px solid rgba(0, 255, 153, 0.4)' : '1px solid rgba(4,120,87,0.2)', boxShadow: isDark ? '0 20px 40px rgba(0,0,0,0.8)' : '0 10px 30px rgba(0,0,0,0.1)',
-                zIndex: 10, pointerEvents: 'none', textAlign: 'center'
-              }}
-            >
-              <p style={{ fontSize: 10, fontWeight: 800, color: isDark ? '#00FF99' : '#047857', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>{data[hoverIdx].d}</p>
-              <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--t1)' }}>{data[hoverIdx].v}<span style={{ fontSize: 11, opacity: 0.7, marginLeft: 2 }}>HRS</span></p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Snapping Tooltip — CSS transition (no AnimatePresence overhead) */}
+        {hoverIdx !== null && (
+          <div
+            style={{
+              position: 'absolute', width: 90, padding: '10px', borderRadius: 14,
+              left: `${(hoverIdx / (data.length - 1)) * 94 + 3}%`,
+              top: `${interactionPts[hoverIdx].y - 55}%`,
+              transform: `translateX(${hoverIdx < 2 ? '0%' : hoverIdx > 4 ? '-100%' : '-50%'})`,
+              transition: 'left 150ms ease-out, top 150ms ease-out',
+              background: isDark ? 'rgba(11, 14, 20, 0.95)' : 'rgba(255,255,255,0.95)',
+              border: isDark ? '1px solid rgba(0, 255, 153, 0.4)' : '1px solid rgba(4,120,87,0.2)', boxShadow: isDark ? '0 20px 40px rgba(0,0,0,0.8)' : '0 10px 30px rgba(0,0,0,0.1)',
+              zIndex: 10, pointerEvents: 'none', textAlign: 'center',
+              animation: 'fadeIn 120ms ease both'
+            }}
+          >
+            <p style={{ fontSize: 10, fontWeight: 800, color: isDark ? '#00FF99' : '#047857', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>{data[hoverIdx].d}</p>
+            <p style={{ fontSize: 18, fontWeight: 900, color: 'var(--t1)' }}>{data[hoverIdx].v}<span style={{ fontSize: 11, opacity: 0.7, marginLeft: 2 }}>HRS</span></p>
+          </div>
+        )}
       </div>
 
+      {/* Clean Typography */}
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 3%', marginTop: 12 }}>
         {data.map(({ d }, i) => {
           const isToday = i === todayIdx;
           const isHovered = i === hoverIdx;
           return (
             <div key={d} style={{ textAlign: 'center' }}>
-              <motion.span
-                animate={{
-                  opacity: isHovered || isToday ? 1 : 0.2,
-                  color: isHovered ? (isDark ? '#A78BFA' : '#7C3AED') : isToday ? (isDark ? '#00FF99' : '#047857') : 'var(--t4)'
-                }}
+              <span
                 style={{
                   fontSize: 11,
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 900,
-                  display: 'inline-block'
+                  display: 'inline-block',
+                  opacity: isHovered || isToday ? 1 : 0.2,
+                  color: isHovered ? (isDark ? '#A78BFA' : '#7C3AED') : isToday ? (isDark ? '#00FF99' : '#047857') : 'var(--t4)',
+                  transition: 'opacity 120ms ease, color 120ms ease'
                 }}
               >
                 {d.toUpperCase()}
-              </motion.span>
+              </span>
             </div>
           );
         })}
       </div>
     </div>
   );
-}
+})
 
 function BadgeCard({ ach, onClick }) {
   const { earned, title, desc, icon, color, cat, earnedAt } = ach;
@@ -396,8 +403,8 @@ function StreakGrid({ streak }) {
 }
 
 // ── Unified AI Intelligence Panel ────────────────────────────
-function AuraIntelligencePanel({ data }) {
-  const { progress, tasks, notes, videos, checkIns, todayCI, burnout, user } = useApp();
+const AuraIntelligencePanel = memo(function AuraIntelligencePanel({ data }) {
+  const { progress, tasks, notes, videos, checkIns, todayCI, burnout, user, syncStatus } = useApp();
   const [ins, setIns] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -410,19 +417,34 @@ function AuraIntelligencePanel({ data }) {
   }, [todayCI]);
 
   // Subject analysis
-  const subEntries = Object.entries(progress?.subjects || {});
-  const sortedSubs = [...subEntries].sort((a, b) => b[1].progress - a[1].progress);
-  const strongSubs = sortedSubs.slice(0, 2);
-  const weakSubs = sortedSubs.slice(-2).reverse();
-  const pendingCount = tasks.filter(t => t.status === 'pending').length;
-  const completedCount = tasks.filter(t => t.status === 'completed').length;
-  const overdueCount = tasks.filter(t => t.status === 'pending' && t.deadline && new Date(t.deadline) < new Date()).length;
+  const subEntries = useMemo(() => Object.entries(progress?.subjects || {}), [progress?.subjects]);
+  const sortedSubs = useMemo(() => [...subEntries].sort((a, b) => b[1].progress - a[1].progress), [subEntries]);
+  const strongSubs = useMemo(() => sortedSubs.slice(0, 2), [sortedSubs]);
+  const weakSubs = useMemo(() => sortedSubs.slice(-2).reverse(), [sortedSubs]);
+  const pendingCount = useMemo(() => tasks.filter(t => t.status === 'pending').length, [tasks]);
+  const completedCount = useMemo(() => tasks.filter(t => t.status === 'completed').length, [tasks]);
+  const overdueCount = useMemo(() => tasks.filter(t => t.status === 'pending' && t.deadline && new Date(t.deadline) < new Date()).length, [tasks]);
+
+  // Stable serialized dependency for data prop
+  const dataString = JSON.stringify(data);
+
+  // AppState ref to prevent missing dependency warnings & redundant executions
+  const stateRef = useRef({ progress, tasks, notes, videos, checkIns, todayCI, user });
+  useEffect(() => {
+    stateRef.current = { progress, tasks, notes, videos, checkIns, todayCI, user };
+  }, [progress, tasks, notes, videos, checkIns, todayCI, user]);
 
   useEffect(() => {
     if (!AI.enabled()) return;
+
+    // Guard: Only fetch if we have some data or sync has completed/errored
+    const hasData = stateRef.current.tasks.length > 0 || stateRef.current.notes?.length > 0 || (stateRef.current.progress && stateRef.current.progress.totalHours > 0);
+    const isLoaded = syncStatus === 'synced' || syncStatus === 'error' || syncStatus === 'idle';
+    if (!hasData && !isLoaded) return;
+
     setLoading(true);
     setError(null);
-    progressInsights(data, { progress, tasks, notes, videos, checkIns, todayCI, user })
+    progressInsights(JSON.parse(dataString), stateRef.current)
       .then(r => {
         if (r) setIns(r);
         else setError('AI returned empty response. Your API key may be rate-limited — try again in a moment.');
@@ -432,7 +454,7 @@ function AuraIntelligencePanel({ data }) {
         setError(err.message || 'Failed to connect to AI service.');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [dataString, syncStatus]);
 
   if (!AI.enabled()) return (
     <div className="card" style={{ padding: 32, textAlign: 'center' }}>
@@ -643,7 +665,7 @@ function AuraIntelligencePanel({ data }) {
       </div>
     </div>
   );
-}
+})
 
 // ── Daily Report Modal ─────────────────────────
 function ReportModal({ data, onClose }) {
@@ -764,12 +786,7 @@ function ReportModal({ data, onClose }) {
 // ── Main ──────────────────────────────────────
 export default function Progress() {
   const { progress, tasks, notes, videos, allAchs, checkIns, todayCI, burnout, A } = useApp();
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile();
 
   const location = useLocation();
   const [tab, setTab] = useState(() => {
@@ -840,12 +857,10 @@ export default function Progress() {
     : '—';
 
   const renderSubmitButton = (fullWidth = false) => (
-    <motion.button
+    <button
       onClick={calSubmit}
       disabled={aiLoading}
-      whileHover={{ scale: 1.02, boxShadow: calDone ? '0 12px 28px rgba(0,0,0,0.35)' : '0 12px 28px rgba(0,200,150,0.55)' }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: 'spring', stiffness: 350, damping: 14 }}
+      className="cal-submit-btn"
       style={{
         width: fullWidth ? '100%' : 176,
         height: fullWidth ? 50 : 96,
@@ -854,17 +869,17 @@ export default function Progress() {
           ? 'var(--s4)'
           : calDone
             ? 'rgba(255,255,255,0.12)'
-            : 'linear-gradient(180deg, #1de9b6 0%, #00897b 100%)',
+            : 'linear-gradient(180deg, rgba(9, 205, 131, 0.16) 0%, rgba(9, 205, 131, 0.04) 100%)',
         border: calDone && !aiLoading
           ? '1px solid rgba(255,255,255,0.25)'
-          : 'none',
-        backdropFilter: calDone ? 'blur(12px)' : 'none',
-        WebkitBackdropFilter: calDone ? 'blur(12px)' : 'none',
+          : '1px solid rgba(9, 205, 131, 0.35)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         boxShadow: aiLoading
           ? 'none'
           : calDone
             ? '0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
-            : '0 8px 24px rgba(0,200,150,0.40), inset 0 1px 0 rgba(255,255,255,0.20)',
+            : '0 8px 24px rgba(9, 205, 131, 0.15), inset 0 1px 0 rgba(255,255,255,0.08)',
         cursor: aiLoading ? 'wait' : 'pointer',
         display: 'flex',
         flexDirection: fullWidth ? 'row' : 'column',
@@ -872,23 +887,24 @@ export default function Progress() {
         justifyContent: 'center',
         gap: fullWidth ? 8 : 4,
         transformOrigin: 'top center',
+        transition: 'transform 200ms cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 200ms ease',
       }}
     >
       {aiLoading ? (
-        <div className="spinner" style={{ width: fullWidth ? 18 : 24, height: fullWidth ? 18 : 24, borderWidth: 2.5, borderColor: 'rgba(255,255,255,0.35)', borderTopColor: 'white' }} />
+        <div className="spinner" style={{ width: fullWidth ? 18 : 24, height: fullWidth ? 18 : 24, borderWidth: 2.5, borderColor: 'rgba(9, 205, 131, 0.35)', borderTopColor: 'var(--p)' }} />
       ) : (
-        <span className="material-symbols-outlined" style={{ fontSize: fullWidth ? 20 : 26, color: calDone ? 'rgba(255,255,255,0.85)' : 'white', fontVariationSettings: "'FILL' 1" }}>{calDone ? 'refresh' : 'auto_awesome'}</span>
+        <span className="material-symbols-outlined" style={{ fontSize: fullWidth ? 20 : 26, color: calDone ? 'rgba(255,255,255,0.85)' : 'var(--p)', fontVariationSettings: "'FILL' 1" }}>{calDone ? 'refresh' : 'auto_awesome'}</span>
       )}
       <span style={{
         fontSize: fullWidth ? 13 : 12.5,
         fontWeight: 900,
-        color: calDone ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.95)',
+        color: calDone ? 'rgba(255,255,255,0.75)' : 'var(--p)',
         textTransform: 'uppercase',
         letterSpacing: '0.12em',
       }}>
         {aiLoading ? 'Loading…' : calDone ? 'Recalibrate' : 'Initialize'}
       </span>
-    </motion.button>
+    </button>
   );
 
   // Sync tab if location state changes (e.g. clicking Badges while on Progress page)
@@ -901,18 +917,18 @@ export default function Progress() {
   const [cat, setCat] = useState('All');
   const [selectedAch, setSelectedAch] = useState(null);
 
-  const weekData = DAYS.map((d, i) => ({ d, v: progress?.weeklyHours?.[i] ?? 0 }));
+  const weekData = useMemo(() => DAYS.map((d, i) => ({ d, v: progress?.weeklyHours?.[i] ?? 0 })), [progress?.weeklyHours]);
   const avg = useMemo(() => overallProgress(progress?.subjects), [progress?.subjects]);
-  const subList = Object.entries(progress?.subjects || {});
+  const subList = useMemo(() => Object.entries(progress?.subjects || {}), [progress?.subjects]);
 
-  const reportData = {
+  const reportData = useMemo(() => ({
     streak: progress?.streak || 0,
     focusHoursThisWeek: progress?.thisWeekHours || 0,
     pendingTasks: tasks.filter(t => t.status === 'pending').map(t => t.title),
     completedTasks: tasks.filter(t => t.status === 'completed').length,
     totalNotes: notes?.length || 0,
     watchedVideos: videos?.filter(v => v.watched).length || 0
-  };
+  }), [progress?.streak, progress?.thisWeekHours, tasks, notes, videos]);
 
   return (
     <div className="page">
@@ -1127,7 +1143,9 @@ export default function Progress() {
 
                 {/* Mood Grid */}
                 <div>
-                  <p style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Current Mood</p>
+                  <p style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>
+                    Current Mood{isMobile ? ` · ${MOODS.find(x => x.v === mood)?.l || ''}` : ''}
+                  </p>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: isMobile ? 6 : 8 }}>
                     {MOODS.map(m => {
                       const isActive = mood === m.v;
@@ -1150,14 +1168,15 @@ export default function Progress() {
                           }}
                         >
                           <span style={{ fontSize: isMobile ? 26 : 32, filter: mood !== m.v ? 'grayscale(100%) opacity(35%)' : 'none', transition: 'filter 200ms' }}>{m.e}</span>
-                          <span style={{ 
-                            fontSize: isMobile ? 9.5 : 12.5, 
-                            fontWeight: 800, 
-                            color: mood === m.v ? m.c : 'var(--t4)', 
-                            textTransform: 'uppercase', 
-                            letterSpacing: '0.04em',
-                            display: isMobile && !isActive ? 'none' : 'block'
-                          }}>{m.l}</span>
+                          {!isMobile && (
+                            <span style={{ 
+                              fontSize: 12.5, 
+                              fontWeight: 800, 
+                              color: mood === m.v ? m.c : 'var(--t4)', 
+                              textTransform: 'uppercase', 
+                              letterSpacing: '0.04em'
+                            }}>{m.l}</span>
+                          )}
                         </button>
                       );
                     })}

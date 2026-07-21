@@ -67,7 +67,7 @@ export const COLORS = {
   'History':     '#fde047', // Soft Yellow
   'Economics':   '#bef264', // Lime
   'Computer Sc.':'#67e8f9', // Cyan
-  'Other':       'var(--t4)',
+  'Others':      'var(--t4)',
 };
 export const subjectColor    = (s) => COLORS[s] || 'var(--p)';
 export const SUBJECT_COLORS  = COLORS; // alias
@@ -86,7 +86,7 @@ export const MOODS = [
   { v:5, emoji:'🤩', label:'Amazing',  color:'#44ea9d' },
 ];
 
-export const SUBJECTS = Object.keys(COLORS).filter(s=>s!=='Other');
+export const SUBJECTS = Object.keys(COLORS);
 
 // ── Progress Calc ───────────────────────────
 export const calcBurnout = (checkIns=[]) => {

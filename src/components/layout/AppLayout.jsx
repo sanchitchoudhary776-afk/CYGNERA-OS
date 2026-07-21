@@ -149,7 +149,7 @@ export default function AppLayout({ children }) {
   const isFocusPage = location.pathname === '/focus';
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', width: '100vw' }}>
       
       {/* PERSISTENT AUDIO ENGINE (Ghost Layer) */}
       <div style={{ 
@@ -195,6 +195,7 @@ export default function AppLayout({ children }) {
       {/* Main scroll area */}
       <main id="los-main" style={{
         flex: 1,
+        minWidth: 0,
         overflowY: 'auto',
         overflowX: 'hidden',
         height: '100dvh',
@@ -281,7 +282,9 @@ export default function AppLayout({ children }) {
         <div key={`${location.pathname}-${theme}`} style={{
           animation: 'pageEnter 360ms cubic-bezier(0.4,0,0.2,1) both',
           minHeight: 'calc(100dvh - 64px)',
-          paddingBottom: '120px'
+          paddingBottom: '120px',
+          willChange: 'transform, opacity',
+          transform: 'translate3d(0, 0, 0)'
         }}>
           {children}
         </div>
@@ -835,21 +838,42 @@ export default function AppLayout({ children }) {
   );
 }
 const SyncIndicator = memo(function SyncIndicator() {
-  const { syncStatus } = useApp();
+  const { syncStatus, forceSync } = useApp();
   const { isAuth } = useAuth();
   if (!isAuth) return null;
 
   const CONFIG = {
     syncing: { icon: 'cloud_sync', color: 'var(--p)', label: 'Syncing...', spin: true },
     synced: { icon: 'cloud_done', color: '#10b981', label: 'Cloud Saved', spin: false },
-    error: { icon: 'cloud_off', color: '#ef4444', label: 'Offline', spin: false },
+    error: { icon: 'cloud_off', color: '#ef4444', label: 'Offline — tap to refresh', spin: false },
+    idle: { icon: 'cloud_queue', color: 'var(--t4)', label: 'Connecting...', spin: false },
   };
 
   const c = CONFIG[syncStatus] || CONFIG.synced;
+  const isClickable = syncStatus !== 'syncing';
+
+  const handleClick = () => {
+    if (!isClickable) return;
+    if (forceSync) forceSync();
+  };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 99, background: 'var(--s1)', border: '1px solid var(--surface-b)', cursor: 'default', transition: 'all 0.3s ease' }} title={c.label}>
-      <span className={`material-symbols-outlined ${c.spin ? 'spinning' : ''}`} style={{ fontSize: 18, color: c.color, fontVariationSettings: "'FILL' 1" }}>
+    <div
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick(); }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+        borderRadius: 99, background: 'var(--s1)', border: '1px solid var(--surface-b)',
+        cursor: isClickable ? 'pointer' : 'wait',
+        transition: 'all 0.3s ease',
+        userSelect: 'none',
+      }}
+      title={isClickable ? 'Click to refresh cloud sync' : 'Syncing...'}
+      className="sync-indicator-btn"
+    >
+      <span className={`material-symbols-outlined ${c.spin ? 'spinning' : ''}`} style={{ fontSize: 18, color: c.color, fontVariationSettings: "'FILL' 1", transition: 'color 0.3s ease' }}>
         {c.icon}
       </span>
       <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--t4)', textTransform: 'uppercase', letterSpacing: '0.05em' }} className="hide-mobile">
@@ -858,6 +882,8 @@ const SyncIndicator = memo(function SyncIndicator() {
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spinning { animation: spin 2s linear infinite; }
+        .sync-indicator-btn:hover { background: var(--s2) !important; border-color: var(--p) !important; }
+        .sync-indicator-btn:active { transform: scale(0.95); }
       `}</style>
     </div>
   );
@@ -1114,6 +1140,7 @@ function AuraAmbientCheckIn() {
               {/* Invisible native input for interactive sliding */}
               <input 
                 type="range" 
+                className="invisible-slider"
                 min={1} 
                 max={10} 
                 value={energy} 

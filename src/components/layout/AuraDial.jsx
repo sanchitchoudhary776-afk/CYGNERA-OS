@@ -18,25 +18,23 @@ const NAV = [
   { to: '/settings', icon: 'settings', label: 'Settings', color: 'var(--t4)' },
 ];
 
-const MOBILE_CONSTELLATION = [
-  { x: 0, y: -190 },
-  { x: -75, y: -160 },
-  { x: 75, y: -160 },
-  { x: -125, y: -70 },
-  { x: 125, y: -70 },
-  { x: -125, y: 30 },
-  { x: 125, y: 30 },
-  { x: -100, y: 120 },
-  { x: 100, y: 120 },
-  { x: 0, y: 200 }
-];
+// Dynamic concentric semi-circles are calculated on the fly for mobile
 
 /* ── Optimized OrbitItem — Pure CSS Transitions (zero framer-motion) ── */
 const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, onClick, isOpen }) => {
   let offsetX, offsetY;
   if (isMobile) {
-    offsetX = MOBILE_CONSTELLATION[index].x;
-    offsetY = MOBILE_CONSTELLATION[index].y;
+    const isEven = index % 2 === 0;
+    const arcIndex = Math.floor(index / 2); // 0, 1, 2, 3, 4
+    const radius = isEven ? 145 : 90;
+    
+    // Spacing from -165 degrees (-Math.PI + 0.26) to -15 degrees (-0.26)
+    const angleStart = -Math.PI + 0.26;
+    const angleSpan = Math.PI - 0.52;
+    const angleRad = angleStart + (arcIndex / 4) * angleSpan;
+    
+    offsetX = Math.cos(angleRad) * radius;
+    offsetY = Math.sin(angleRad) * radius;
   } else {
     const radius = isDesktop ? 320 : 240;
     const totalArc = Math.PI;
@@ -47,6 +45,13 @@ const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, 
   }
 
   const isActive = location.pathname.startsWith(item.to);
+
+  // Concentric dual-position labeling scheme to prevent text overlaps on mobile
+  const labelStyle = isMobile
+    ? (index % 2 === 0
+        ? { top: -22, bottom: 'auto', fontSize: 8.5, padding: '3px 8px' }
+        : { bottom: -22, top: 'auto', fontSize: 8.5, padding: '3px 8px' })
+    : { bottom: isDesktop ? -28 : -26, top: 'auto', fontSize: isDesktop ? 10 : 9, padding: '4px 10px' };
 
   return (
     <div style={{
@@ -70,10 +75,9 @@ const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, 
           transition: isOpen
             ? 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 240ms ease'
             : 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1), opacity 160ms ease',
-          transitionDelay: isOpen
-            ? `${index * 22}ms`
-            : `${(NAV.length - 1 - index) * 12}ms`,
+          transitionDelay: (isMobile && isOpen) ? `${index * 30}ms` : '0ms',
           pointerEvents: isOpen ? 'auto' : 'none',
+          willChange: 'transform, opacity',
         }}
       >
         {/* Hover layer — CSS class handles hover/tap on compositor thread */}
@@ -117,7 +121,7 @@ const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, 
               flexShrink: 0
             }}>
               <span className="material-symbols-outlined" style={{
-                fontSize: isDesktop ? 24 : 22,
+                fontSize: isMobile ? 20 : (isDesktop ? 24 : 22),
                 color: isActive ? item.color : 'var(--t1)',
                 fontVariationSettings: isActive ? "'FILL' 1, 'wght' 700, 'GRAD' 200, 'opsz' 24" : "'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24",
                 transition: 'color 200ms ease'
@@ -129,12 +133,10 @@ const OrbitItem = memo(({ item, index, isMobile, isDesktop, location, iconSize, 
             {/* Label */}
             <div style={{
               position: 'absolute',
-              bottom: isDesktop ? -28 : -26,
-              fontSize: isDesktop ? 10 : 9,
+              ...labelStyle,
               fontWeight: 800,
               color: isActive ? item.color : 'var(--t1)',
               background: 'var(--s1)',
-              padding: '4px 10px',
               borderRadius: 999,
               border: `1px solid ${isActive ? `${item.color}55` : 'var(--surface-b)'}`,
               textTransform: 'uppercase',
@@ -362,8 +364,8 @@ function AuraDial() {
   }, []);
 
   const { isMobile, isTablet, isDesktop } = breakpoints;
-  const iconSize = isDesktop ? 52 : 48;
-  const hubSize = isDesktop ? 68 : 56;
+  const iconSize = isMobile ? 42 : (isDesktop ? 52 : 48);
+  const hubSize = isMobile ? 52 : (isDesktop ? 68 : 56);
 
   // Close when navigating to a new page
   useEffect(() => {
@@ -466,7 +468,7 @@ function AuraDial() {
           position: 'fixed',
           left: '50%',
           bottom: isMobile ? 40 : (isTablet || hasTouch) ? 70 : 60,
-          transform: `translateX(-50%) translateY(${(isMobile && isOpen) ? -window.innerHeight * 0.4 : 0}px)`,
+          transform: `translateX(-50%) translateY(${(isMobile && isOpen) ? -20 : 0}px)`,
           zIndex: 99,
           display: 'flex',
           alignItems: 'center',
@@ -499,7 +501,7 @@ function AuraDial() {
             style={{
               position: 'absolute',
               left: '50%', top: '50%',
-              transform: `translate(-50%, -50%) scale(${isOpen ? 0.82 : 1}) rotate(${isOpen ? ((isMobile || hasTouch) ? 135 : 45) : 0}deg)`,
+              transform: `translate3d(-50%, -50%, 0) scale(${isOpen ? 0.82 : 1}) rotate(${isOpen ? ((isMobile || hasTouch) ? 135 : 45) : 0}deg)`,
               width: hubSize,
               height: hubSize,
               borderRadius: '50%',
@@ -514,7 +516,8 @@ function AuraDial() {
                 ? `0 0 40px ${activeItem.color}55, 0 8px 32px rgba(0,0,0,0.6)`
                 : 'var(--sh-lg)',
               transition: 'transform 280ms cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 280ms ease',
-              touchAction: 'manipulation'
+              touchAction: 'manipulation',
+              willChange: 'transform, box-shadow'
             }}
           >
             <span className="material-symbols-outlined" style={{
@@ -534,6 +537,8 @@ function AuraDial() {
               pointerEvents: 'none',
               zIndex: -1,
               animation: isOpen ? 'auraRotate 25s linear infinite' : 'none',
+              willChange: 'transform',
+              transform: 'translate3d(0, 0, 0)'
             }}>
               <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                 <circle
@@ -553,7 +558,8 @@ function AuraDial() {
               onClick={(e) => { e.stopPropagation(); triggerHaptic('medium'); setShowChat(true); setIsOpen(false); }}
               style={{
                 position: 'absolute',
-                left: -60,
+                left: isMobile ? -48 : -60,
+                ...(isMobile ? { top: -15 } : {}),
                 width: 32, height: 32, borderRadius: '50%',
                 background: 'var(--s1)', border: '1px solid var(--p)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',

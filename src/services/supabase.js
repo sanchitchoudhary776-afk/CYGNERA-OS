@@ -31,16 +31,72 @@ export const supabase = supabaseClient;
 // ── Connection Health ───────────────────────────────────
 let _isOnline = navigator.onLine;
 let _lastSuccessfulSync = 0;
+let _lastRealCheck = 0;
+let _realOnline = navigator.onLine;
 
-window.addEventListener('online', () => { _isOnline = true; });
-window.addEventListener('offline', () => { _isOnline = false; });
+window.addEventListener('online', () => { _isOnline = true; _realOnline = true; });
+window.addEventListener('offline', () => { _isOnline = false; _realOnline = false; });
 
 export const connectionStatus = {
   get isOnline() { return _isOnline; },
   get isConfigured() { return !!supabaseClient; },
   get lastSync() { return _lastSuccessfulSync; },
   get canSync() { return _isOnline && !!supabaseClient; },
+  // Force re-mark as online (used by keepalive after successful probe)
+  forceOnline() { _isOnline = true; _realOnline = true; },
 };
+
+/**
+ * Refresh the Supabase auth session.
+ * Call this periodically to prevent stale JWT tokens from silently
+ * killing all cloud operations.
+ */
+export async function refreshSession() {
+  if (!supabaseClient) return false;
+  try {
+    const { data, error } = await supabaseClient.auth.refreshSession();
+    if (error) {
+      console.warn('[Supabase] Session refresh failed:', error.message);
+      return false;
+    }
+    if (data?.session) {
+      _isOnline = true;
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('[Supabase] Session refresh error:', err.message);
+    return false;
+  }
+}
+
+/**
+ * Lightweight real connectivity probe.
+ * Fetches a tiny query from Supabase to verify the connection is truly alive.
+ * Unlike navigator.onLine, this catches stale connections and expired tokens.
+ */
+export async function probeConnection() {
+  if (!supabaseClient) return false;
+  // Throttle: don't probe more than once every 30 seconds
+  if (Date.now() - _lastRealCheck < 30000) return _realOnline;
+  _lastRealCheck = Date.now();
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const { error } = await supabaseClient
+      .from('user_data')
+      .select('user_id')
+      .limit(1)
+      .abortSignal(controller.signal);
+    clearTimeout(timeout);
+    _realOnline = !error;
+    _isOnline = _realOnline;
+    return _realOnline;
+  } catch {
+    _realOnline = false;
+    return false;
+  }
+}
 
 // ── Retry Logic with Exponential Backoff ────────────────
 const MAX_RETRIES = 3;

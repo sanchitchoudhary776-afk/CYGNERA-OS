@@ -47,16 +47,30 @@ function spawnDrop(ctx, dest, volumeMul) {
 
 function startRainEngine(ctx, masterGain, volRef) {
   let running = true;
+  const activeTimeouts = new Set();
+  
   const scheduleDrops = () => {
     if (!running) return;
     const count = 1 + Math.floor(Math.random() * 2);
     for (let i = 0; i < count; i++) {
-      setTimeout(() => { if (running) spawnDrop(ctx, masterGain, volRef.current); }, Math.random() * 80);
+      const dropTimeout = setTimeout(() => {
+        activeTimeouts.delete(dropTimeout);
+        if (running) spawnDrop(ctx, masterGain, volRef.current);
+      }, Math.random() * 80);
+      activeTimeouts.add(dropTimeout);
     }
-    setTimeout(scheduleDrops, 80 + Math.random() * 200);
+    const nextTimeout = setTimeout(() => {
+      activeTimeouts.delete(nextTimeout);
+      scheduleDrops();
+    }, 80 + Math.random() * 200);
+    activeTimeouts.add(nextTimeout);
   };
   scheduleDrops();
-  return () => { running = false; };
+  return () => {
+    running = false;
+    activeTimeouts.forEach(clearTimeout);
+    activeTimeouts.clear();
+  };
 }
 
 export function AudioProvider({ children }) {
@@ -104,6 +118,12 @@ export function AudioProvider({ children }) {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [spotifyUrl]);
+
+  useEffect(() => {
+    return () => {
+      stopCurrent();
+    };
+  }, []);
 
   const stopCurrent = () => {
     if (engineRef.current) {

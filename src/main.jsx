@@ -24,13 +24,16 @@ try {
     });
 
     // Register the PWA service worker (offline caching + instant load)
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then(registration => {
-        console.log('[PWA SW] Registered. Scope:', registration.scope);
-      })
-      .catch(err => {
-        console.warn('[PWA SW] Registration failed (non-critical):', err.message);
-      });
+    // Only in production — prevents stale caches from fighting Vite HMR in dev
+    if (import.meta.env.PROD) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(registration => {
+          console.log('[PWA SW] Registered. Scope:', registration.scope);
+        })
+        .catch(err => {
+          console.warn('[PWA SW] Registration failed (non-critical):', err.message);
+        });
+    }
 
     // Register the alarm service worker (background notifications)
     navigator.serviceWorker.register('/alarm-sw.js', { scope: '/alarm' })
@@ -96,6 +99,13 @@ try {
 } catch (e) {
   // Even the error handlers themselves are wrapped — truly crash-proof
 }
+
+// ── Pause animations when tab is hidden (saves CPU/battery) ──────
+try {
+  document.addEventListener('visibilitychange', () => {
+    document.body.classList.toggle('page-hidden', document.hidden);
+  });
+} catch (e) {}
 
 // Force clear all legacy/testing data to ensure a completely clean start
 try {

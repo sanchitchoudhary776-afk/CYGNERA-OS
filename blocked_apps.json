@@ -1,9 +1,9 @@
 {
   "enabled": true,
   "blockedApps": [
-    "Discord",
-    "Spotify",
-    "Steam"
+    "TLauncher",
+    "Camera",
+    "YouTube Music"
   ],
   "blockedSites": [
     "instagram.com",
@@ -12,6 +12,7 @@
     "tiktok.com",
     "facebook.com",
     "reddit.com",
-    "snapchat.com"
+    "snapchat.com",
+    "youtube.in"
   ]
 }

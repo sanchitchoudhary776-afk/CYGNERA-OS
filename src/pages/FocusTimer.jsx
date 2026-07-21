@@ -10,6 +10,7 @@ import { SUBJECTS } from '@utils';
 import toast from 'react-hot-toast';
 import { Counter } from '@components/ui/PremiumUI';
 import { Portal } from '@components/ui';
+import { useIsMobile } from '@utils/platform';
 
 const MAX_MINS = 180;
 
@@ -21,15 +22,8 @@ function fmt(s) {
 const CircularDialSlider = memo(function CircularDialSlider({ value, onChange, disabled, running, remain, isBreak }) {
   const containerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [svgSize, setSvgSize] = useState(window.innerWidth < 640 ? 290 : 420);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setSvgSize(window.innerWidth < 640 ? 290 : 420);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const isMobile = useIsMobile();
+  const svgSize = isMobile ? 290 : 420;
 
   const handlePointerDown = (e) => {
     if (disabled) return;
@@ -356,7 +350,7 @@ function CheckInModal({ onDone }) {
               </div>
               <div style={{ position: 'relative', height: 6, background: 'var(--s5)', borderRadius: 999 }}>
                 <div style={{ position: 'absolute', left: 0, height: '100%', width: `${((val - min) / (max - min)) * 100}%`, background: `linear-gradient(90deg, color-mix(in srgb, ${color} 40%, transparent), ${color})`, borderRadius: 999, boxShadow: `0 0 8px color-mix(in srgb, ${color} 30%, transparent)`, transition: 'width 0.1s ease' }} />
-                <input type="range" min={min} max={max} step={step} value={val} onChange={e => set(Number(e.target.value))} style={{ position: 'absolute', inset: 0, width: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
+                <input type="range" className="invisible-slider" min={min} max={max} step={step} value={val} onChange={e => set(Number(e.target.value))} style={{ position: 'absolute', inset: 0, width: '100%', opacity: 0, cursor: 'pointer', zIndex: 2 }} />
                 <div style={{ position: 'absolute', top: '50%', left: `${((val - min) / (max - min)) * 100}%`, transform: 'translate(-50%,-50%)', width: 18, height: 18, borderRadius: '50%', background: color, border: '3px solid var(--s2)', boxShadow: `0 0 8px color-mix(in srgb, ${color} 50%, transparent)`, pointerEvents: 'none', transition: 'left 0.1s ease' }} />
               </div>
             </div>
@@ -453,9 +447,9 @@ const SoundScape = memo(function SoundScape() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4, width: '100%', maxWidth: 220 }}>
           <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--t4)' }}>volume_down</span>
           <input
-            type="range" min={0} max={100} value={vol}
+            type="range" className="volume-slider" min={0} max={100} value={vol}
             onChange={e => setVol(Number(e.target.value))}
-            style={{ flex: 1, accentColor: 'var(--p)', cursor: 'pointer', height: 4 }}
+            style={{ flex: 1, cursor: 'pointer' }}
           />
           <span className="material-symbols-outlined" style={{ fontSize: 14, color: 'var(--t4)' }}>volume_up</span>
         </div>
@@ -616,6 +610,7 @@ export default function FocusTimer() {
   const [isZen, setIsZen] = useState(false);
   const [aiTip, setAiTip] = useState('');
   const [isDesktop, setIsDesktop] = useState(window.innerWidth > 1024);
+  const isMobile = useIsMobile();
   const [showSessionComplete, setShowSessionComplete] = useState(false);
   const [showBreakComplete, setShowBreakComplete] = useState(false);
   const prevRemain = useRef(remain);
@@ -744,7 +739,7 @@ export default function FocusTimer() {
 
       {/* Top Row: Combined Timer & Music Card */}
       <div className="card fadeup d2" style={{
-        padding: '32px',
+        padding: isMobile ? '14px' : '32px',
         background: `radial-gradient(circle at top right, var(--p-sub), var(--s1))`,
         border: '1px solid var(--card-b-h)',
         position: 'relative',
@@ -1037,7 +1032,7 @@ export default function FocusTimer() {
         </div>
 
         {/* Right Column: Session History */}
-        <div className="fadeup d6 card" style={{ padding: 20, minHeight: 220, overflowY: 'auto' }}>
+        <div className="fadeup d6 card" style={{ padding: 20, minHeight: 220 }}>
           <p className="section-label" style={{ marginBottom: 16 }}>Session History</p>
           {history.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap-sm)' }}>
@@ -1122,6 +1117,15 @@ const ZEN_SCENES = [
   { id: 'sakura',    label: 'Sakura',     icon: 'spa',             url: 'https://images.unsplash.com/photo-1522383225653-ed111181a951?auto=format&fit=crop&w=3840&q=90' }
 ];
 
+const MANTRAS = [
+  "Silence the noise. Find your flow.",
+  "One breath. One task. One moment.",
+  "Deep work is respect for your mind.",
+  "Inhale clarity, exhale distraction.",
+  "Where attention goes, energy flows.",
+  "Stay present. Breathe. Create."
+];
+
 // ── Zen Mode Distraction-Free Fullscreen Overlay ──────────────────────────
 const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationMins, subject, handleStart, onClose, A, isBreak }) {
   const [showControls, setShowControls] = useState(true);
@@ -1130,15 +1134,6 @@ const ZenModeOverlay = memo(function ZenModeOverlay({ remain, running, durationM
   const [showScenePicker, setShowScenePicker] = useState(false);
 
   const activeScene = ZEN_SCENES.find(s => s.id === zenBg) || ZEN_SCENES[0];
-
-  const MANTRAS = [
-    "Silence the noise. Find your flow.",
-    "One breath. One task. One moment.",
-    "Deep work is respect for your mind.",
-    "Inhale clarity, exhale distraction.",
-    "Where attention goes, energy flows.",
-    "Stay present. Breathe. Create."
-  ];
 
   // Rotate mantras slowly
   useEffect(() => {

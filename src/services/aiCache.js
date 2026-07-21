@@ -193,7 +193,9 @@ export async function cachedAICall(feature, dataFingerprint, aiFn, { ttlMs = 4 *
   // 1. Check cache first
   const cached = getCachedResult(feature, dataFingerprint, ttlMs);
   if (cached) {
-    console.log(`[AI Cache] HIT for ${feature}`);
+    if (import.meta.env.DEV) {
+      console.log(`[AI Cache] HIT for ${feature}`);
+    }
     return { result: cached, fromCache: true };
   }
 
@@ -215,7 +217,9 @@ export async function cachedAICall(feature, dataFingerprint, aiFn, { ttlMs = 4 *
     if (result) {
       recordUsage(feature);
       setCachedResult(feature, dataFingerprint, result);
-      console.log(`[AI Cache] STORED for ${feature}`);
+      if (import.meta.env.DEV) {
+        console.log(`[AI Cache] STORED for ${feature}`);
+      }
     }
     return { result, fromCache: false };
   } catch (err) {
