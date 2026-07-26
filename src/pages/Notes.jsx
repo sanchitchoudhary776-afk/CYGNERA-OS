@@ -63,59 +63,190 @@ const FONT_OPTIONS = [
 
 function QuickCapture({ onSave, onClose }) {
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState('Web Dev');
+  const [tagsStr, setTagsStr] = useState('');
+
+  const handleSave = () => {
+    if (!content.trim() && !title.trim()) {
+      toast.error('Note content or title is empty');
+      return;
+    }
+    const tags = tagsStr.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+    if (!tags.includes('quick')) tags.push('quick');
+    onSave({
+      title: title.trim() || 'Quick Note',
+      content,
+      subject,
+      tags
+    });
+  };
+
   return (
     <div onClick={onClose} style={{ position:'fixed',inset:0,zIndex:110,background:'var(--overlay)',display:'flex',alignItems:'center',justifyContent:'center',padding:20,animation:'modalFadeIn 200ms ease both' }}>
-      <div onClick={e=>e.stopPropagation()} style={{ width:'100%',maxWidth:480,background:'var(--s1)',borderRadius:'var(--r-xl)',boxShadow:'0 32px 120px rgba(0,0,0,0.5), 0 0 0 1px var(--surface-b)',animation:'modalCenterIn 300ms var(--spring) both', overflow:'hidden', display:'flex',flexDirection:'column' }}>
+      <div onClick={e=>e.stopPropagation()} style={{ width:'100%',maxWidth:520,background:'var(--s1)',borderRadius:'var(--r-xl)',boxShadow:'0 32px 120px rgba(0,0,0,0.5), 0 0 0 1px var(--surface-b)',animation:'modalCenterIn 300ms var(--spring) both', overflow:'hidden', display:'flex',flexDirection:'column' }}>
         <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--surface-b)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <h3 style={{ fontSize:15, fontWeight:800, color:'var(--t1)', display:'flex', alignItems:'center', gap:8 }}><span className="material-symbols-outlined" style={{color:'var(--p)', fontSize:18}}>bolt</span> Quick Capture</h3>
+          <h3 style={{ fontSize:15, fontWeight:800, color:'var(--t1)', display:'flex', alignItems:'center', gap:8 }}><span className="material-symbols-outlined" style={{color:'var(--p)', fontSize:20}}>bolt</span> Quick Capture Note</h3>
           <button onClick={onClose} className="icon-btn" style={{ background:'var(--s2)', border:'none', borderRadius:'50%', width:28, height:28 }}><span className="material-symbols-outlined" style={{ fontSize:15 }}>close</span></button>
         </div>
-        <textarea
-          autoFocus
-          value={content}
-          onChange={e=>setContent(e.target.value)}
-          placeholder="Jot down a quick thought or reminder..."
-          style={{ width:'100%', height:180, padding:'20px', background:'transparent', border:'none', color:'var(--t2)', fontSize:15, resize:'none', outline:'none', lineHeight:1.6, fontFamily:'var(--font-sans)' }}
-        />
-        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--surface-b)', background:'var(--s2)', display:'flex', justifyContent:'flex-end' }}>
-          <button onClick={()=>{ if(!content.trim()){toast.error('Note is empty');return;} onSave({ title:'Quick Note', content, subject:'All', tags:['quick'] })}} className="btn btn-primary" style={{ padding:'8px 24px', fontSize:12, fontWeight:800, background:'var(--t1)', color:'var(--bg)', border:'none' }}>Save Note</button>
+        <div style={{ padding:20, display:'flex', flexDirection:'column', gap:12 }}>
+          <input
+            className="input"
+            value={title}
+            onChange={e=>setTitle(e.target.value)}
+            placeholder="Note Title (Optional)..."
+            style={{ fontSize:14, fontWeight:700, padding:'10px 14px' }}
+          />
+          <div style={{ display:'flex', gap:10 }}>
+            <select
+              value={subject}
+              onChange={e=>setSubject(e.target.value)}
+              style={{ flex:1, background:'var(--s2)', border:'1px solid var(--surface-b)', color:'var(--t1)', borderRadius:10, padding:'8px 12px', fontSize:12, fontWeight:700, outline:'none' }}
+            >
+              {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <input
+              className="input"
+              value={tagsStr}
+              onChange={e=>setTagsStr(e.target.value)}
+              placeholder="Tags (e.g. #exam, #todo)..."
+              style={{ flex:1.5, fontSize:12, padding:'8px 12px' }}
+            />
+          </div>
+          <textarea
+            autoFocus
+            value={content}
+            onChange={e=>setContent(e.target.value)}
+            placeholder="Jot down a quick thought, concept, or reminder..."
+            style={{ width:'100%', height:160, padding:'14px', background:'var(--s2)', borderRadius:12, border:'1px solid var(--surface-b)', color:'var(--t1)', fontSize:14, resize:'none', outline:'none', lineHeight:1.6, fontFamily:'var(--font-sans)' }}
+          />
+        </div>
+        <div style={{ padding:'12px 20px', borderTop:'1px solid var(--surface-b)', background:'var(--s2)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <span style={{ fontSize:11, color:'var(--t4)', fontWeight:600 }}>Tip: Press Alt + N anytime for Quick Note</span>
+          <button onClick={handleSave} className="btn btn-primary" style={{ padding:'8px 24px', fontSize:12, fontWeight:800 }}>Save Note</button>
         </div>
       </div>
     </div>
   );
 }
 
-const NoteCard = memo(function NoteCard({ note, onOpen, onDelete }) {
+const NoteCard = memo(function NoteCard({ note, viewStyle = 'grid', onOpen, onDelete, onTogglePin, onDuplicate }) {
   const color = SUBJECT_COLORS[note.subject] || 'var(--p)';
   const { askConfirm } = usePremium();
   const readTime = Math.max(1, Math.ceil(getWordCount(note.content) / 200));
+
   const handleDelete = async (e) => {
     e.stopPropagation();
     if (await askConfirm('Delete Note', `Permanently delete "${note.title || 'Untitled'}"?`)) {
       onDelete(note.id);
     }
   };
+
+  const handlePin = (e) => {
+    e.stopPropagation();
+    onTogglePin(note);
+  };
+
+  const handleDuplicate = (e) => {
+    e.stopPropagation();
+    onDuplicate(note);
+  };
+
+  if (viewStyle === 'list') {
+    return (
+      <div
+        className="card card-hover content-auto gpu"
+        onClick={() => onOpen(note)}
+        style={{
+          padding: '14px 18px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          background: note.pinned ? `linear-gradient(90deg, color-mix(in srgb, ${color} 10%, var(--s2)), var(--s2))` : 'var(--s2)',
+          borderLeft: `4px solid ${color}`,
+          borderTop: '1px solid var(--surface-b)',
+          borderRight: '1px solid var(--surface-b)',
+          borderBottom: '1px solid var(--surface-b)',
+          borderRadius: 12,
+          transition: 'all 200ms ease'
+        }}
+      >
+        {note.pinned && (
+          <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--p)', flexShrink: 0, fontVariationSettings: "'FILL' 1" }} title="Pinned Note">push_pin</span>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <h4 style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--t1)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {note.title || 'Untitled'}
+            </h4>
+            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '2px 8px', borderRadius: 999, background: `color-mix(in srgb, ${color} 14%, transparent)`, color, textTransform: 'uppercase', flexShrink: 0 }}>
+              {note.subject}
+            </span>
+            {note.aiEnhanced && (
+              <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 999, background: 'rgba(96,165,250,0.12)', color: '#3b82f6', border: '1px solid rgba(96,165,250,0.2)', display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 10 }}>auto_awesome</span> AI
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: 12.5, color: 'var(--t3)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {getCleanPreview(note.content) || 'Empty note...'}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 600 }}>{getWordCount(note.content)} words</span>
+          <span style={{ fontSize: 11, color: 'var(--t4)', fontWeight: 600 }}>{fmt.shortDate(note.updatedAt)}</span>
+
+          <div className="card-actions" style={{ display: 'flex', gap: 4 }}>
+            <button onClick={handlePin} className="icon-btn" style={{ width: 28, height: 28, background: 'var(--s3)', border: '1px solid var(--surface-b)', color: note.pinned ? 'var(--p)' : 'var(--t4)' }} title={note.pinned ? 'Unpin' : 'Pin'}>
+              <span className="material-symbols-outlined" style={{ fontSize: 15, fontVariationSettings: note.pinned ? "'FILL' 1" : "'FILL' 0" }}>push_pin</span>
+            </button>
+            <button onClick={handleDuplicate} className="icon-btn" style={{ width: 28, height: 28, background: 'var(--s3)', border: '1px solid var(--surface-b)', color: 'var(--t4)' }} title="Duplicate">
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>content_copy</span>
+            </button>
+            <button onClick={handleDelete} className="icon-btn" style={{ width: 28, height: 28, background: 'var(--s3)', border: '1px solid var(--surface-b)', color: 'var(--t4)' }} title="Delete">
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="card card-hover tilt-card content-auto gpu" onClick={() => onOpen(note)}
       style={{
-        padding:0, cursor:'pointer', overflow:'hidden', display:'flex', flexDirection:'column',
-        background: `linear-gradient(145deg, var(--s2) 0%, color-mix(in srgb, ${color} 4%, var(--s2)) 100%)`,
-        borderTop: `2px solid ${color}`
+        padding:0, cursor:'pointer', overflow:'hidden', display:'flex', flexDirection:'column', position:'relative',
+        background: `linear-gradient(145deg, var(--s2) 0%, color-mix(in srgb, ${color} 5%, var(--s2)) 100%)`,
+        borderTop: `3px solid ${color}`,
+        boxShadow: note.pinned ? `0 0 20px color-mix(in srgb, ${color} 15%, transparent)` : 'none'
       }}>
       <div style={{ padding:'20px', flex:1 }}>
-        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:12 }}>
-          <h4 style={{ fontSize:15, fontWeight:800, color:'var(--t1)', lineHeight:1.3, wordBreak:'break-word' }}>{note.title||'Untitled'}</h4>
-          <button onClick={handleDelete} className="icon-btn" style={{ width:28, height:28, opacity:0, transform:'translateX(5px)', transition:'all 200ms ease', background:'var(--s3)', border:'1px solid var(--surface-b)', color:'var(--t4)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize:15 }}>delete</span>
-          </button>
+        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, marginBottom:10 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6, flex:1, minWidth:0 }}>
+            {note.pinned && <span className="material-symbols-outlined" style={{ fontSize:16, color:'var(--p)', flexShrink:0, fontVariationSettings:"'FILL' 1" }} title="Pinned Note">push_pin</span>}
+            <h4 style={{ fontSize:15, fontWeight:800, color:'var(--t1)', lineHeight:1.3, wordBreak:'break-word', margin:0 }}>{note.title||'Untitled'}</h4>
+          </div>
+          <div style={{ display:'flex', gap:4, opacity:0, transition:'all 200ms ease' }} className="card-hover-actions">
+            <button onClick={handlePin} className="icon-btn" style={{ width:26, height:26, background:'var(--s3)', border:'1px solid var(--surface-b)', color: note.pinned?'var(--p)':'var(--t4)' }} title={note.pinned?'Unpin':'Pin'}>
+              <span className="material-symbols-outlined" style={{ fontSize:14, fontVariationSettings: note.pinned?"'FILL' 1":"'FILL' 0" }}>push_pin</span>
+            </button>
+            <button onClick={handleDuplicate} className="icon-btn" style={{ width:26, height:26, background:'var(--s3)', border:'1px solid var(--surface-b)', color:'var(--t4)' }} title="Duplicate">
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>content_copy</span>
+            </button>
+            <button onClick={handleDelete} className="icon-btn" style={{ width:26, height:26, background:'var(--s3)', border:'1px solid var(--surface-b)', color:'var(--t4)' }} title="Delete">
+              <span className="material-symbols-outlined" style={{ fontSize:14 }}>delete</span>
+            </button>
+          </div>
         </div>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:14 }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:12 }}>
           <span style={{ fontSize:10, fontWeight:800, padding:'3px 10px', borderRadius:999, background:`color-mix(in srgb, ${color} 12%, transparent)`, color, textTransform:'uppercase', letterSpacing:'0.05em' }}>{note.subject}</span>
           {note.aiEnhanced && <span style={{ fontSize:10, fontWeight:800, padding:'3px 10px', borderRadius:999, background:'rgba(96,165,250,0.12)', color:'#3b82f6', border:'1px solid rgba(96,165,250,0.2)', textTransform:'uppercase', letterSpacing:'0.05em', display:'flex', alignItems:'center', gap:4 }}><span className="material-symbols-outlined" style={{fontSize:12}}>auto_awesome</span> AI</span>}
         </div>
-        <p style={{ fontSize:13, color:'var(--t3)', lineHeight:1.6, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical' }}>{getCleanPreview(note.content)}</p>
+        <p style={{ fontSize:13, color:'var(--t3)', lineHeight:1.6, overflow:'hidden', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', margin:0 }}>{getCleanPreview(note.content) || 'Empty note...'}</p>
         {note.tags?.length > 0 && (
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:16 }}>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:14 }}>
             {note.tags.slice(0,3).map(t=><span key={t} style={{ fontSize:10.5, fontWeight:600, color:'var(--t4)' }}>#{t}</span>)}
           </div>
         )}
@@ -127,8 +258,10 @@ const NoteCard = memo(function NoteCard({ note, onOpen, onDelete }) {
         </div>
         <span style={{ fontSize:11, color:'var(--t4)', fontWeight:600 }}>{fmt.shortDate(note.updatedAt)}</span>
       </div>
-      <style>{`.card-hover:hover .icon-btn { opacity: 1 !important; transform: translateX(0) !important; }
-        .card-hover:hover .icon-btn:hover { background: var(--danger) !important; color: white !important; border-color: var(--danger) !important; }`}</style>
+      <style>{`
+        .card-hover:hover .card-hover-actions { opacity: 1 !important; }
+        .card-hover .icon-btn:hover { background: var(--s4) !important; color: var(--t1) !important; }
+      `}</style>
     </div>
   );
 });
@@ -540,6 +673,14 @@ function NoteEditor({ note, onSave, onClose }) {
               <button onClick={()=>setViewMode('read')} style={{ padding:'0 16px',borderRadius:8,border:'none',background:viewMode==='read'?'var(--s3)':'transparent',color:viewMode==='read'?'var(--t1)':'var(--t4)',fontWeight:800,fontSize:12,cursor:'pointer',transition:'all 200ms' }}>Read</button>
             </div>
             <div style={{ width:1,height:24,background:'var(--surface-b)',margin:'0 2px' }}/>
+            {/* Copy Clipboard */}
+            <button onClick={() => {
+              const plainText = (form.title ? form.title + '\n\n' : '') + getCleanPreview(form.content);
+              navigator.clipboard.writeText(plainText);
+              toast.success('Copied text to clipboard! 📋');
+            }} className="icon-btn" style={{ background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:10,width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center' }} title="Copy to Clipboard">
+              <span className="material-symbols-outlined" style={{ fontSize:18,color:'var(--t2)' }}>content_copy</span>
+            </button>
             {/* Export */}
             <div style={{ position:'relative' }}>
               <button onClick={()=>togglePopover('export')} className="icon-btn" style={{ background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:10,width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center' }} title="Export"><span className="material-symbols-outlined" style={{ fontSize:18,color:'var(--t2)' }}>ios_share</span></button>
@@ -825,6 +966,9 @@ export default function Notes() {
   const isMobile = useIsMobile();
   const [search, setSearch] = useState('');
   const [sub, setSub] = useState('All');
+  const [selectedTag, setSelectedTag] = useState('All');
+  const [sortBy, setSortBy] = useState('updated'); // 'updated' | 'title' | 'words' | 'created'
+  const [viewStyle, setViewStyle] = useState('grid'); // 'grid' | 'list'
 
   const [editing, setEditing] = useState(() => {
     const savedId = localStorage.getItem('los_active_note_id');
@@ -835,14 +979,28 @@ export default function Notes() {
     }
     return null;
   });
+
   const [show, setShow] = useState(() => {
     const savedId = localStorage.getItem('los_active_note_id');
     const savedShow = localStorage.getItem('los_show_note_editor') === 'true';
     if (savedShow && savedId) return savedId === 'new_note' || notes.some(n => n.id === savedId);
     return false;
   });
+
   const [showQuick, setShowQuick] = useState(false);
   const isInitialMount = useRef(true);
+
+  // Global Alt+N keyboard shortcut for Quick Note
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setShowQuick(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (isInitialMount.current) { isInitialMount.current = false; return; }
@@ -857,14 +1015,64 @@ export default function Notes() {
     }
   }, [show, editing]);
 
-  const filtered = useMemo(() => notes.filter(n => {
-    const ms = sub==='All' || n.subject===sub;
-    const mq = !search || n.title.toLowerCase().includes(search.toLowerCase()) || n.content.toLowerCase().includes(search.toLowerCase());
-    return ms && mq;
-  }), [notes, search, sub]);
+  // Extract all unique tags across notes
+  const allTags = useMemo(() => {
+    const tagSet = new Set();
+    notes.forEach(n => {
+      if (Array.isArray(n.tags)) {
+        n.tags.forEach(t => { if (t) tagSet.add(t); });
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [notes]);
+
+  const filtered = useMemo(() => {
+    let result = notes.filter(n => {
+      const ms = sub === 'All' || n.subject === sub;
+      const mt = selectedTag === 'All' || (n.tags && n.tags.includes(selectedTag));
+      const mq = !search || n.title?.toLowerCase().includes(search.toLowerCase()) || n.content?.toLowerCase().includes(search.toLowerCase());
+      return ms && mt && mq;
+    });
+
+    // Sort notes (pinned always rise to top)
+    result.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+
+      if (sortBy === 'title') {
+        return (a.title || '').localeCompare(b.title || '');
+      } else if (sortBy === 'words') {
+        return getWordCount(b.content) - getWordCount(a.content);
+      } else if (sortBy === 'created') {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      } else {
+        // 'updated'
+        return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+      }
+    });
+
+    return result;
+  }, [notes, search, sub, selectedTag, sortBy]);
 
   const handleOpenNote = useCallback((n) => { setEditing(n); setShow(true); }, []);
-  const handleDeleteNote = useCallback((id) => { A.note.remove(id); toast.success('Deleted'); }, [A.note]);
+  const handleDeleteNote = useCallback((id) => { A.note.remove(id); toast.success('Note deleted'); }, [A.note]);
+
+  const handleTogglePin = useCallback((n) => {
+    A.note.update({ ...n, pinned: !n.pinned });
+    toast.success(n.pinned ? 'Unpinned note' : 'Pinned note to top 📌');
+  }, [A.note]);
+
+  const handleDuplicateNote = useCallback((n) => {
+    const dup = {
+      ...n,
+      id: undefined,
+      title: `Copy of ${n.title || 'Untitled'}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    A.note.add(dup);
+    toast.success('Note duplicated 📋');
+  }, [A.note]);
 
   const save = (note, isAuto = false) => {
     let finalNote = { ...note };
@@ -879,46 +1087,207 @@ export default function Notes() {
     if (!isAuto) { setShow(false); setShowQuick(false); setEditing(null); }
   };
 
+  const pinnedCount = useMemo(() => notes.filter(n => n.pinned).length, [notes]);
+
   return (
     <div className="page">
       <style>{`@keyframes modalCenterIn{from{opacity:0;transform:scale(0.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}`}</style>
+      
+      {/* Header */}
       <div className="fadeup" style={{ display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,flexWrap:'wrap' }}>
         <div>
-          <h1 className="shimmer-text page-title">My Notes</h1>
-          <p style={{ fontSize:13,color:'var(--t3)',marginTop:4 }}>{notes.length} notes · {[...new Set(notes.map(n=>n.subject))].length} subjects</p>
+          <h1 className="shimmer-text page-title">My Notes & Knowledge Base</h1>
+          <p style={{ fontSize:13,color:'var(--t3)',marginTop:4 }}>
+            {notes.length} notes · {[...new Set(notes.map(n=>n.subject))].length} subjects {pinnedCount > 0 ? `· ${pinnedCount} pinned 📌` : ''}
+          </p>
         </div>
-        <div style={{ display:'flex',gap:'var(--gap-sm)' }}>
-          <button onClick={()=>setShowQuick(true)} className="btn btn-surface" style={{ padding:'10px 18px',fontSize:13,fontWeight:700 }}><span className="material-symbols-outlined" style={{ fontSize:18,color:'var(--p)' }}>bolt</span>Quick Note</button>
-          <button onClick={()=>{setEditing({});setShow(true);}} className="btn btn-primary" style={{ padding:'10px 20px',fontSize:13,fontWeight:700 }}><span className="material-symbols-outlined" style={{ fontSize:18 }}>edit_document</span>Full Document</button>
+        <div style={{ display:'flex',gap:'var(--gap-sm)',flexWrap:'wrap' }}>
+          <button onClick={()=>setShowQuick(true)} className="btn btn-surface" style={{ padding:'10px 18px',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:6 }} title="Shortcut: Alt + N">
+            <span className="material-symbols-outlined" style={{ fontSize:18,color:'var(--p)' }}>bolt</span>Quick Note
+          </button>
+          <button onClick={()=>{setEditing({});setShow(true);}} className="btn btn-primary" style={{ padding:'10px 20px',fontSize:13,fontWeight:700,display:'flex',alignItems:'center',gap:6 }}>
+            <span className="material-symbols-outlined" style={{ fontSize:18 }}>edit_document</span>Full Document
+          </button>
         </div>
       </div>
-      <div className="fadeup d1" style={{ display:'flex',flexDirection:'column',gap:'var(--gap-sm)' }}>
-        <div style={{ position:'relative' }}>
-          <span className="material-symbols-outlined" style={{ position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:18,color:'var(--t4)',pointerEvents:'none' }}>search</span>
-          <input className="input" style={{ paddingLeft:42 }} placeholder="Search notes…" value={search} onChange={e=>setSearch(e.target.value)}/>
+
+      {/* Controls & Filter Section */}
+      <div className="fadeup d1" style={{ display:'flex',flexDirection:'column',gap:12 }}>
+        {/* Search Bar + Controls */}
+        <div style={{ display:'flex',gap:12,alignItems:'center',flexWrap:'wrap' }}>
+          <div style={{ position:'relative',flex:1,minWidth:220 }}>
+            <span className="material-symbols-outlined" style={{ position:'absolute',left:14,top:'50%',transform:'translateY(-50%)',fontSize:18,color:'var(--t4)',pointerEvents:'none' }}>search</span>
+            <input
+              className="input"
+              style={{ paddingLeft:42,paddingRight:search?36:14 }}
+              placeholder="Search notes by title, concept or content…"
+              value={search}
+              onChange={e=>setSearch(e.target.value)}
+            />
+            {search && (
+              <button onClick={()=>setSearch('')} style={{ position:'absolute',right:12,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'var(--t4)',cursor:'pointer',display:'flex' }}>
+                <span className="material-symbols-outlined" style={{ fontSize:16 }}>close</span>
+              </button>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div style={{ display:'flex',alignItems:'center',gap:6,background:'var(--s2)',border:'1px solid var(--surface-b)',borderRadius:10,padding:'4px 10px' }}>
+            <span className="material-symbols-outlined" style={{ fontSize:16,color:'var(--t4)' }}>sort</span>
+            <select
+              value={sortBy}
+              onChange={e=>setSortBy(e.target.value)}
+              style={{ background:'transparent',border:'none',color:'var(--t2)',fontSize:12,fontWeight:700,outline:'none',cursor:'pointer' }}
+            >
+              <option value="updated">Recently Modified</option>
+              <option value="created">Newly Created</option>
+              <option value="title">Title (A-Z)</option>
+              <option value="words">Word Count</option>
+            </select>
+          </div>
+
+          {/* Layout Toggle (Grid vs List) */}
+          <div style={{ display:'flex',background:'var(--s2)',borderRadius:10,padding:3,border:'1px solid var(--surface-b)' }}>
+            <button
+              onClick={()=>setViewStyle('grid')}
+              style={{ width:32,height:30,borderRadius:7,border:'none',background:viewStyle==='grid'?'var(--s3)':'transparent',color:viewStyle==='grid'?'var(--p)':'var(--t4)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 150ms' }}
+              title="Grid View"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize:18 }}>grid_view</span>
+            </button>
+            <button
+              onClick={()=>setViewStyle('list')}
+              style={{ width:32,height:30,borderRadius:7,border:'none',background:viewStyle==='list'?'var(--s3)':'transparent',color:viewStyle==='list'?'var(--p)':'var(--t4)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 150ms' }}
+              title="Compact List View"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize:18 }}>view_list</span>
+            </button>
+          </div>
         </div>
-        <div style={{ display:'flex',gap:'var(--gap-xs)',overflowX:'auto',paddingBottom:2 }}>
+
+        {/* Subject Filter Pills */}
+        <div style={{ display:'flex',gap:6,overflowX:'auto',paddingBottom:2,scrollbarWidth:'none' }}>
           {ALL_SUBS.map(f => {
             const c = SUBJECT_COLORS[f] || 'var(--p)';
-            return <button key={f} onClick={()=>setSub(f)} style={{ padding:'6px 15px',borderRadius:999,border:`1px solid ${sub===f?c:'var(--surface-b)'}`,background:sub===f?`${c}14`:'transparent',color:sub===f?c:'var(--t3)',fontWeight:700,fontSize:12,cursor:'pointer',whiteSpace:'nowrap',transition:'all 160ms ease',flexShrink:0 }}>{f}</button>;
+            const active = sub === f;
+            return (
+              <button
+                key={f}
+                onClick={()=>setSub(f)}
+                style={{
+                  padding:'5px 14px',
+                  borderRadius:999,
+                  border:`1px solid ${active?c:'var(--surface-b)'}`,
+                  background:active?`${c}18`:'transparent',
+                  color:active?c:'var(--t3)',
+                  fontWeight:750,
+                  fontSize:12,
+                  cursor:'pointer',
+                  whiteSpace:'nowrap',
+                  transition:'all 160ms ease',
+                  flexShrink:0
+                }}
+              >
+                {f}
+              </button>
+            );
           })}
         </div>
+
+        {/* Tag Filter Pills */}
+        {allTags.length > 0 && (
+          <div style={{ display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginTop:2 }}>
+            <span style={{ fontSize:11,fontWeight:800,color:'var(--t4)',textTransform:'uppercase',letterSpacing:'0.06em',marginRight:2 }}>Tags:</span>
+            <button
+              onClick={()=>setSelectedTag('All')}
+              style={{
+                padding:'2px 8px',
+                borderRadius:6,
+                border:'1px solid var(--surface-b)',
+                background:selectedTag==='All'?'var(--s3)':'transparent',
+                color:selectedTag==='All'?'var(--t1)':'var(--t4)',
+                fontSize:11,
+                fontWeight:700,
+                cursor:'pointer'
+              }}
+            >
+              All Tags
+            </button>
+            {allTags.map(t => {
+              const active = selectedTag === t;
+              return (
+                <button
+                  key={t}
+                  onClick={()=>setSelectedTag(t)}
+                  style={{
+                    padding:'2px 8px',
+                    borderRadius:6,
+                    border:active?'1px solid var(--p)':'1px solid var(--surface-b)',
+                    background:active?'rgba(9,205,131,0.12)':'transparent',
+                    color:active?'var(--p)':'var(--t4)',
+                    fontSize:11,
+                    fontWeight:600,
+                    cursor:'pointer'
+                  }}
+                >
+                  #{t}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* Notes Grid / List */}
       {filtered.length > 0 ? (
-        <div className="tilt-container" style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,320px),1fr))',gap:'var(--gap-card)' }}>
-          {filtered.map((n,i) => <div key={n.id} className="fadeup tilt-card" style={{ animationDelay:`${i*0.04}s` }}><NoteCard note={n} onOpen={handleOpenNote} onDelete={handleDeleteNote}/></div>)}
-        </div>
+        viewStyle === 'grid' ? (
+          <div className="tilt-container" style={{ display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,320px),1fr))',gap:'var(--gap-card)' }}>
+            {filtered.map((n,i) => (
+              <div key={n.id} className="fadeup tilt-card" style={{ animationDelay:`${i*0.03}s` }}>
+                <NoteCard
+                  note={n}
+                  viewStyle="grid"
+                  onOpen={handleOpenNote}
+                  onDelete={handleDeleteNote}
+                  onTogglePin={handleTogglePin}
+                  onDuplicate={handleDuplicateNote}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+            {filtered.map((n,i) => (
+              <div key={n.id} className="fadeup" style={{ animationDelay:`${i*0.02}s` }}>
+                <NoteCard
+                  note={n}
+                  viewStyle="list"
+                  onOpen={handleOpenNote}
+                  onDelete={handleDeleteNote}
+                  onTogglePin={handleTogglePin}
+                  onDuplicate={handleDuplicateNote}
+                />
+              </div>
+            ))}
+          </div>
+        )
       ) : (
-        <div className="fadeup" style={{ textAlign:'center',padding:'80px 20px' }}>
-          <div style={{ fontSize:64,marginBottom:20,display:'inline-block' }}>📓</div>
-          <p style={{ fontSize:15,fontWeight:800,color:'var(--t1)' }}>{search?'No matches found':'Your knowledge base is empty'}</p>
-          <p style={{ fontSize:13,color:'var(--t4)',marginTop:8 }}>{search?'Try a different search term.':'Capture your first insight and let AI help you master it.'}</p>
-          {!search && <button onClick={()=>{setEditing({});setShow(true);}} className="btn btn-primary" style={{ padding:'12px 32px',marginTop:24 }}>Create First Note</button>}
+        <div className="fadeup" style={{ textAlign:'center',padding:'80px 20px',background:'var(--s2)',borderRadius:20,border:'1px solid var(--surface-b)' }}>
+          <div style={{ fontSize:56,marginBottom:16,display:'inline-block' }}>📓</div>
+          <p style={{ fontSize:15,fontWeight:800,color:'var(--t1)' }}>{search || selectedTag !== 'All' ? 'No matching notes found' : 'Your knowledge base is empty'}</p>
+          <p style={{ fontSize:13,color:'var(--t4)',marginTop:6 }}>{search || selectedTag !== 'All' ? 'Try adjusting your search query or active tag filter.' : 'Capture your first insight and let AI help you master it.'}</p>
+          {!(search || selectedTag !== 'All') && (
+            <button onClick={()=>{setEditing({});setShow(true);}} className="btn btn-primary" style={{ padding:'12px 32px',marginTop:20 }}>
+              Create First Note
+            </button>
+          )}
         </div>
       )}
+
       {show && (isMobile
         ? <MobileNoteEditor note={editing} onSave={save} onClose={()=>{setShow(false);setEditing(null);}}/>
         : <NoteEditor note={editing} onSave={save} onClose={()=>{setShow(false);setEditing(null);}}/>)}
+      
       {showQuick && <QuickCapture onSave={save} onClose={()=>setShowQuick(false)}/>}
     </div>
   );
